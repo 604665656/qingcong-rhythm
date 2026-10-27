@@ -18,6 +18,13 @@
   html,body{margin:0;padding:0;height:100%;max-width:100vw;overflow:hidden;background:var(--ink-0);color:var(--txt);font-family:var(--font);}
   body{position:fixed;inset:0;overscroll-behavior:none;touch-action:none;}
   #app{position:absolute;inset:0;overflow:hidden;}
+  /* 强制横屏 / 竖屏：把整个 app 旋转 90° 并交换宽高。
+     只在「当前视口方向 ≠ 目标方向」时加 rot90，避免多转一次。 */
+  body.rot90 #app{
+    position:fixed;top:50%;left:50%;
+    width:100vh;height:100vw;max-width:none;max-height:none;
+    transform:translate(-50%,-50%) rotate(90deg);
+  }
 
   /* ---------------- 背景 ---------------- */
   .bg{position:absolute;inset:0;pointer-events:none;}
@@ -265,7 +272,9 @@
   /* ---------------- 遮罩/弹层 ---------------- */
   .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,5,12,.72);backdrop-filter:blur(10px);z-index:20;}
   .overlay.on{display:flex;}
-  .panel{width:min(92vw,420px);border-radius:24px;padding:26px 26px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6);}
+  .panel{width:min(92vw,420px);border-radius:24px;padding:26px 26px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6);position:relative;}
+  /* 面板右上角关闭 ✕：装扮页很长，底部按钮要滚动才够得着，必须给顶部关闭入口 */
+  .panel>.sheet-close{position:absolute;top:12px;right:12px;z-index:6;}
   .panel h3{margin:0 0 18px;font-size:17px;letter-spacing:.14em;font-weight:800;}
   .row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px;color:#ded3f0;}
   .row:last-of-type{border-bottom:0;}
@@ -462,6 +471,7 @@ __PLATFORM_CSS__
           <button class="btn ghost" id="dressBtn">装扮</button>
           <button class="btn ghost" id="settingBtn">设置</button>
           <button class="btn ghost" id="helpBtn">玩法</button>
+          <button class="btn ghost" id="orientBtn">屏幕：自动</button>
           <div class="best">最佳 <b id="bestLbl">—</b></div>
         </div>
       </div>
@@ -553,6 +563,7 @@ __PLATFORM_CSS__
 
   <div class="overlay" id="settingOverlay">
     <div class="panel glass">
+      <button class="sheet-close" data-close="settingOverlay" title="关闭">✕</button>
       <h3>设置</h3>
       <div class="row"><label>判定偏移</label><span class="val" id="offVal">0 ms</span></div>
       <div class="row"><label><input type="range" id="offRange" min="-200" max="200" step="5" value="0" /></label><span style="font-size:10.5px;color:var(--txt-dim)">音画不同步时微调</span></div>
@@ -591,6 +602,7 @@ __PLATFORM_CSS__
 
   <div class="overlay" id="dressOverlay">
     <div class="panel glass">
+      <button class="sheet-close" data-close="dressOverlay" title="关闭">✕</button>
       <h3>装扮 · 个性化</h3>
       <div class="dress-section"><label>主题配色</label><div class="themes" id="themes"></div></div>
       <div class="dress-section"><label>我的 B 站身份</label>
@@ -1967,6 +1979,10 @@ function pressDisp(lane, ts){
 
 addEventListener('keydown', e=>{
   if(e.code==='Escape'){
+    // 有弹层先关弹层（装扮页很长，Esc 是最快的退出路径）
+    const openOv = ['modeOverlay','helpOverlay','settingOverlay','dressOverlay','rankOverlay']
+      .find(i=>{ const n=document.getElementById(i); return n && n.classList.contains('on'); });
+    if(openOv){ closePanel(openOv); return; }
     if(S.screen==='game'){ S.paused? resume() : pause(); }
     return;
   }
@@ -2340,7 +2356,7 @@ function saveCustom(){
   try{
     localStorage.setItem('qc_custom', JSON.stringify({
       theme:S.theme, nick:S.nick, offset:S.offset, speed:S.speed, vol:S.vol,
-      sfxVol:S.sfxVol, sfxOn:S.sfxOn, auto:S.auto
+      sfxVol:S.sfxVol, sfxOn:S.sfxOn, auto:S.auto, orient:(S.orient||'auto')
     }));
   }catch(e){}
 }
@@ -2357,6 +2373,7 @@ function loadCustom(){
     if(typeof o.sfxVol==='number') S.sfxVol=o.sfxVol;
     if(typeof o.sfxOn ==='boolean') S.sfxOn=o.sfxOn;
     if(typeof o.auto  ==='boolean') S.auto=o.auto;
+    if(o.orient) S.orient=o.orient;
   }catch(e){}
 }
 /* 把 S 里的设置推回界面控件（加载 / 还原时用） */
@@ -2375,6 +2392,49 @@ function syncOptsUI(){
   const aw=$('#autoSw'); if(aw) aw.classList.toggle('on', !!S.auto);
   const nl=$('#nickLbl'); if(nl) nl.textContent = S.nick || '';
 }
+/* ---------- 强制横屏 / 竖屏 ---------- */
+/* 用 CSS 旋转整个 app 实现，任何环境（本地 / 网页 / Toy webview）都确定生效。
+   官方 SDK 另有 setContainerMode（B站 App 9.9.0+）可切容器横竖屏，
+   但其入参形状需以 SDK 文档为准（需登录查看），确认后再接，避免猜错导致画面被转两次。 */
+function applyOrient(){
+  const b = document.body;
+  b.classList.remove('rot90');
+  const o = S.orient || 'auto';
+  const wide = window.innerWidth > window.innerHeight;
+  if(o==='landscape' && !wide) b.classList.add('rot90');
+  else if(o==='portrait' && wide) b.classList.add('rot90');
+  const ob = $('#orientBtn');
+  if(ob) ob.textContent = o==='auto' ? '屏幕：自动' : (o==='landscape' ? '屏幕：横屏' : '屏幕：竖屏');
+  if(typeof resize === 'function') setTimeout(resize, 80);
+}
+function setOrient(v){
+  S.orient = v; saveCustom(); applyOrient();
+  toast(v==='auto' ? '跟随设备方向' : (v==='landscape' ? '已强制横屏' : '已强制竖屏'));
+}
+window.addEventListener('orientationchange', ()=> setTimeout(applyOrient, 260));
+window.addEventListener('resize', ()=> { if(S.orient && S.orient!=='auto') applyOrient(); });
+
+/* ---------- 面板关闭：右上角 ✕ / 点背景 / Esc ---------- */
+/* 装扮页内容很长，底部「保存/退出」要滚动才够得着，所以必须有多条关闭路径。 */
+const PANEL_EXIT = {
+  dressOverlay: '#dressExit', settingOverlay: '#settingExit',
+  helpOverlay: '#helpClose', modeOverlay: '#modeClose'
+};
+function closePanel(id){
+  const sel = PANEL_EXIT[id];
+  const b = sel ? $(sel) : null;
+  if(b) b.click();
+  else { const ov = $('#'+id); if(ov) ov.classList.remove('on'); }
+}
+function bindPanelClose(){
+  Object.keys(PANEL_EXIT).forEach(id=>{
+    const ov = document.getElementById(id); if(!ov) return;
+    ov.addEventListener('click', e=>{
+      if(e.target === ov || (e.target.dataset && e.target.dataset.close === id)) closePanel(id);
+    });
+  });
+}
+
 /* 面板「保存 / 退出」用的快照与还原 */
 let optSnap = null;
 function snapOpts(){
@@ -2421,6 +2481,13 @@ function bindSettings(){
   $('#dressBtn').onclick = ()=>{ optSnap = snapOpts(); buildDress(); $('#dressOverlay').classList.add('on'); };
   $('#dressSave').onclick = ()=>{ saveCustom(); closeWith('#dressOverlay', '装扮已保存'); };
   $('#dressExit').onclick = ()=>{ const c = changed(); restoreOpts(optSnap); closeWith('#dressOverlay', c ? '已退出，未保存修改' : '已退出'); };
+  const ob=$('#orientBtn');
+  if(ob) ob.onclick = ()=>{
+    const order=['auto','landscape','portrait'];
+    setOrient(order[(order.indexOf(S.orient||'auto')+1) % order.length]);
+  };
+  bindPanelClose();
+  applyOrient();
   $('#modesBtn').onclick = ()=>{ const i=MODES.findIndex(m=>m.id===S.mode); S.mode=MODES[(i+1)%MODES.length].id; applyMode(); openModeInfo(); };
   $('#modeClose').onclick = ()=>{ $('#modeOverlay').classList.remove('on'); if(S.screen==='game' && S.paused && S.modePaused) resume(); };
   const sfxRange2=$('#sfxRange2');
@@ -2490,7 +2557,7 @@ function proceed(){
   loadAch();
   applyTheme();
   renderCat();
-  applyMy(); applyUpCard(); syncOptsUI();
+  applyMy(); applyUpCard(); syncOptsUI(); applyOrient();
   $('#songTitleH1').innerHTML = ((SONG.title||'')).replace(' ', '<br/>') || '嘶恍而过的<br/>青葱岁月';
   $('#composerLbl').textContent = SONG.meta.composer || '—';
   $('#lyricistLbl').textContent = SONG.meta.lyricist || '—';

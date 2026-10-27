@@ -311,6 +311,49 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     'offset=' + sv.got.offset + ' speed=' + sv.got.speed + ' vol=' + sv.got.vol);
   T('退出能还原未保存的修改', sv.back === true, 'back=' + sv.back);
 
+  /* ---- 8. 横竖屏切换 / 面板关闭 ---- */
+  const oc1 = await ev(`(function(){
+    try{
+      var ob = document.getElementById('orientBtn');
+      var hasBtn = !!ob;
+      setOrient('landscape');
+      var l1 = document.body.classList.contains('rot90'), t1 = ob? ob.textContent : '';
+      setOrient('portrait');
+      var l2 = document.body.classList.contains('rot90'), t2 = ob? ob.textContent : '';
+      setOrient('auto');
+      var t3 = ob? ob.textContent : '';
+      var l3 = document.body.classList.contains('rot90');
+      return JSON.stringify({hasBtn:hasBtn, l1:l1, t1:t1, l2:l2, t2:t2, t3:t3, l3:l3,
+        wide: window.innerWidth > window.innerHeight});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const oc = J(oc1, 'oc');
+  T('存在横屏/竖屏切换按钮', oc.hasBtn && /屏幕/.test(oc.t3), 'btn=' + oc.hasBtn + ' text=' + oc.t3);
+  T('强制横屏在竖屏视口下旋转画面', oc.wide ? true : oc.l1 === true, 'wide=' + oc.wide + ' rot90=' + oc.l1);
+  T('强制竖屏在横屏视口下旋转画面', oc.wide ? oc.l2 === true : true, 'wide=' + oc.wide + ' rot90=' + oc.l2);
+  T('切回自动不残留旋转', oc.l3 === false, 'rot90=' + oc.l3);
+
+  const cl1 = await ev(`(function(){
+    try{
+      var x = document.querySelector('#dressOverlay .sheet-close');
+      var hasX = !!x;
+      buildDress();
+      document.getElementById('dressOverlay').classList.add('on');
+      var opened = document.getElementById('dressOverlay').classList.contains('on');
+      if(x) x.click();                       // 右上角 ✕
+      var afterX = document.getElementById('dressOverlay').classList.contains('on');
+      // 点背景关闭
+      document.getElementById('dressOverlay').classList.add('on');
+      var ov = document.getElementById('dressOverlay');
+      ov.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+      var afterBg = ov.classList.contains('on');
+      return JSON.stringify({hasX:hasX, opened:opened, afterX:afterX, afterBg:afterBg});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const cl = J(cl1, 'cl');
+  T('装扮页有右上角 ✕ 关闭', cl.hasX && cl.afterX === false, 'x=' + cl.hasX + ' stillOpen=' + cl.afterX);
+  T('点面板背景也能关闭装扮页', cl.afterBg === false, 'stillOpen=' + cl.afterBg);
+
   // 输出
   console.log('\n================ 新功能专项自测 ================');
   out.forEach(([k, n, e]) => console.log(`${k === 'PASS' ? '✅' : '❌'} ${n}${e ? '  —  ' + e : ''}`));
