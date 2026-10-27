@@ -24,3 +24,7 @@ Thumbs.db
 
 # 线上验证截图
 build/live_shot.png
+build/slide_shot.png
+
+# 抖音小游戏移植（工程未跑通，暂不入库）
+/douyin/

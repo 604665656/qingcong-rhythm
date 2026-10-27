@@ -173,6 +173,8 @@
   .j-GREAT{color:#9ff2dd;text-shadow:0 0 22px rgba(126,232,208,.8);}
   .j-GOOD{color:#a9c6ff;text-shadow:0 0 18px rgba(138,182,255,.7);}
   .j-MISS{color:#ff8b9a;text-shadow:0 0 18px rgba(255,110,140,.8);}
+  .j-HOLD{color:#8ff5e2;text-shadow:0 0 20px rgba(66,232,208,.85);font-size:.82em;letter-spacing:.06em;}
+  .j-BRK{color:#ffc48a;text-shadow:0 0 16px rgba(255,170,110,.75);font-size:.82em;}
 
   .cat-arena{position:absolute;right:clamp(8px,2vw,28px);bottom:clamp(10px,3vh,32px);width:clamp(110px,15vw,190px);pointer-events:none;transition:transform .1s;}
   .cat-arena.hit{animation:catHit .28s cubic-bezier(.2,1.6,.4,1);}
@@ -490,8 +492,9 @@ __PLATFORM_CSS__
       <div class="row"><label>键盘</label><span><span class="kbd">D</span> <span class="kbd">F</span> <span class="kbd">J</span> <span class="kbd">K</span></span></div>
       <div class="row"><label>手机 / 触屏</label><span>点按轨道下方，按住横向滑可连打</span></div>
       <div class="row"><label>手柄</label><span>A B X Y / 十字键，Start 暂停</span></div>
-      <div class="row"><label>长条音符</label><span>按住直到条尾</span></div>
-      <div class="row"><label>判定</label><span>PERFECT ±45ms</span></div>
+      <div class="row"><label>长条音符</label><span>按住直到条尾，按满有收尾判定</span></div>
+      <div class="row"><label>滑条</label><span>带箭头连线的音符，按住横向滑过去</span></div>
+      <div class="row"><label>判定</label><span>PERFECT ±70ms / GREAT ±110ms，点偏一格也能接住</span></div>
       <div class="row"><label>FEVER</label><span>50 连击进入 ×1.5 加成</span></div>
       <div class="row"><label>暂停</label><span><span class="kbd">Esc</span> / 右下角按钮</span></div>
       <div class="help-health">抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。<br/>适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。</div>
@@ -634,7 +637,10 @@ const LANES = 4;
 const KEYMAP = {KeyD:0, KeyF:1, KeyJ:2, KeyK:3, ArrowLeft:0, ArrowDown:1, ArrowUp:2, ArrowRight:3};
 const LANE_COLORS = ['#42e8d0','#ffd166','#ff9ec7','#8ab6ff'];
 const LANE_KEYS = ['D','F','J','K'];
-const WIN = {PERFECT:0.045, GREAT:0.090, GOOD:0.135, MISS:0.180};
+const WIN = {PERFECT:0.070, GREAT:0.110, GOOD:0.155, MISS:0.200};
+/* 跨轨宽容：手机触屏手指比音符宽，点偏一格很常见。
+   本轨没够到音符时，允许相邻轨在更紧的窗口内接手，避免「明明按了却不给分」。 */
+const LANE_ASSIST = 0.078;
 const SCORE_VAL = {PERFECT:1000, GREAT:700, GOOD:350, MISS:0};
 const ACC_VAL = {PERFECT:1, GREAT:0.75, GOOD:0.4, MISS:0};
 const DIFFS = [
@@ -647,7 +653,7 @@ const DIFFS = [
 const S = {
   diff: 'normal', screen:'title', playing:false, paused:false, auto:false,
   offset: 0, speed: 1, vol: 0.8,
-  chart: [], notes: [], beats: [], lyrics: [],
+  chart: [], slides: [], notes: [], beats: [], lyrics: [],
   judge: {PERFECT:0, GREAT:0, GOOD:0, MISS:0}, combo:0, maxCombo:0, score:0, accSum:0, accCount:0,
   fever:false, t:0, startT:0, dur: SONG.meta.duration
 };
@@ -876,10 +882,41 @@ if(window.visualViewport){
 /* ---------- 谱面 ---------- */
 function chartFor(id){
   const raw = SONG.charts[id] || [];
-  return raw.map(n=>({t:n[0], lane:n[1], hold:n[2]||0, hit:false, missed:false, judged:false, holding:false, done:false}))
+  return raw.map(n=>({t:n[0], lane:n[1], hold:n[2]||0, hit:false, missed:false, judged:false,
+                      holding:false, done:false, holdTick:0, broke:false, slide:false, slideDir:0}))
             .sort((a,b)=>a.t-b.t);
 }
 const approach = () => 1.55 / S.speed;
+
+/* ---------- 连线滑条 ----------
+   相邻轨快速连续的几个音符视为一条「下滑音轨」，用光带连起来，
+   玩家按住横向滑过去即可（触屏换轨续打已经支持）。
+   判定仍然是逐个音符判，滑过去会连成串，手感比单点更顺。
+   阈值：间隔 ≤0.45s、跨 1~2 格、至少 3 个音。 */
+function buildSlides(list){
+  const chains = [];
+  let cur = [];
+  for(const n of list){
+    if(!cur.length){ cur=[n]; continue; }
+    const p = cur[cur.length-1];
+    const dt = n.t - p.t;
+    const dl = Math.abs(n.lane - p.lane);
+    if(n.hold || p.hold || dt <= 0 || dt > 0.45 || dl < 1 || dl > 2){
+      if(cur.length >= 3) chains.push(cur);
+      cur = [n];
+    } else cur.push(n);
+  }
+  if(cur.length >= 3) chains.push(cur);
+
+  for(const ch of chains){
+    for(let i=0;i<ch.length;i++){
+      ch[i].slide = true;
+      if(i+1 < ch.length) ch[i].slideDir = Math.sign(ch[i+1].lane - ch[i].lane);
+      else ch[i].slideDir = ch.length>1 ? Math.sign(ch[i].lane - ch[i-1].lane) : 0;
+    }
+  }
+  return chains;
+}
 
 /* ---------- 粒子 ---------- */
 const parts = [];
@@ -904,30 +941,45 @@ function dustUpdate(dt){
 
 /* ---------- 判定 ---------- */
 let fxRings = [];
+/* 在指定轨道集合里找最近的未命中音符 */
+function pickNote(now, lanes, limit){
+  let best=null, bestAbs=1e9;
+  for(const n of S.chart){
+    if(n.hit || n.hold || lanes.indexOf(n.lane)<0) continue;
+    const d = Math.abs(n.t - now);
+    if(d < bestAbs && d <= limit){ best=n; bestAbs=d; }
+  }
+  if(best) return {note:best, abs:bestAbs};
+  for(const n of S.chart){                       // 再找长条头
+    if(n.hit || !n.hold || n.holding || lanes.indexOf(n.lane)<0) continue;
+    const d = Math.abs(n.t - now);
+    if(d < bestAbs && d <= limit){ best=n; bestAbs=d; }
+  }
+  return best ? {note:best, abs:bestAbs} : null;
+}
 function judge(lane, ts){
   if(S.auto) return;
   const now = ts;
-  let best=null, bestAbs=1e9;
-  for(const n of S.chart){
-    if(n.hit || n.lane!==lane || n.hold) continue;
-    const d = Math.abs(n.t - now);
-    if(d < bestAbs && d <= WIN.MISS){ best=n; bestAbs=d; }
+  // 先认本轨（完整窗口）
+  let got = pickNote(now, [lane], WIN.MISS);
+  let usedLane = lane;
+  // 本轨空按 → 让相邻轨在更紧的窗口里接手（触屏宽手指的宽容）
+  if(!got){
+    const near = [];
+    if(lane > 0) near.push(lane-1);
+    if(lane < LANES-1) near.push(lane+1);
+    if(near.length) got = pickNote(now, near, LANE_ASSIST);
+    if(got) usedLane = got.note.lane;
   }
-  // 长条头
-  if(!best){
-    for(const n of S.chart){
-      if(n.hit || n.lane!==lane || !n.hold || n.holding) continue;
-      const d = Math.abs(n.t - now);
-      if(d < bestAbs && d <= WIN.MISS){ best=n; bestAbs=d; }
-    }
-  }
-  if(!best) return;
+  if(!got) return;
+
+  const best = got.note, bestAbs = got.abs;
   let j = 'MISS';
   if(bestAbs<=WIN.PERFECT) j='PERFECT'; else if(bestAbs<=WIN.GREAT) j='GREAT'; else if(bestAbs<=WIN.GOOD) j='GOOD';
   if(j==='MISS') return;
   best.hit = true; best.judged = true; best.holding = !!best.hold;
-  if(best.hold){ best.holdStart = now; best.holdNeed = best.hold; }
-  registerHit(best, j, lane);
+  if(best.hold){ best.holdStart = now; best.holdNeed = best.hold; best.holdTick = 0; }
+  registerHit(best, j, best.lane);
 }
 function registerHit(note, j, lane){
   S.judge[j]++;
@@ -956,11 +1008,11 @@ function registerHit(note, j, lane){
   document.body.classList.toggle('perfect', j==='PERFECT');
   if(j==='PERFECT') setTimeout(()=>document.body.classList.remove('perfect'), 90);
 }
-function showJudge(j){
+function showJudge(j, cls){
   const el = $('#judgeText');
   el.className = ''; el.textContent = j;
   void el.offsetWidth;
-  el.className = 'show j-'+j;
+  el.className = 'show j-' + (cls || j);
 }
 
 /* ---------- HUD ---------- */
@@ -1041,6 +1093,32 @@ function drawPlayfield(t){
   if(pulse > 0.01){
     pctx.fillStyle = 'rgba(255,196,150,'+(0.030*pulse)+')';
     pctx.fillRect(laneX, 0, totalW, judgeY);
+  }
+
+  // 连线滑条：把链上相邻音符连成一条光带（先画，压在音符下面）
+  if(S.slides && S.slides.length){
+    const apS = approach();
+    for(const ch of S.slides){
+      let prev = null;
+      for(const n of ch){
+        const y = judgeY - ((n.t - t)/apS)*(judgeY - V.topY);
+        const x = laneX + laneW*(n.lane+0.5);
+        if(prev && y > -24 && prev.y > -24 && y < judgeY + 60){
+          pctx.save();
+          pctx.globalAlpha = n.hit ? 0.08 : 0.42;
+          pctx.strokeStyle = hexA(LANE_COLORS[n.lane], 0.8);
+          pctx.lineWidth = laneW*0.10;
+          pctx.lineCap = 'round';
+          pctx.beginPath(); pctx.moveTo(prev.x, prev.y); pctx.lineTo(x, y); pctx.stroke();
+          pctx.globalAlpha = n.hit ? 0.08 : 0.72;
+          pctx.strokeStyle = 'rgba(255,255,255,0.8)';
+          pctx.lineWidth = Math.max(1.2, laneW*0.02);
+          pctx.beginPath(); pctx.moveTo(prev.x, prev.y); pctx.lineTo(x, y); pctx.stroke();
+          pctx.restore();
+        }
+        prev = {x:x, y:y};
+      }
+    }
   }
 
   // 长条（先画，位于音符层下方）
@@ -1151,6 +1229,18 @@ function drawNote(n, y){
   pctx.fill();
   pctx.strokeStyle = 'rgba(255,255,255,.9)'; pctx.lineWidth = 1.2;
   roundRect(pctx, cx-w/2, y-h/2, w, h, h/2); pctx.stroke();
+  // 滑条音符：画一个方向箭头，提示往哪边滑
+  if(n.slide && n.slideDir){
+    const aw = laneW*0.15, ah = laneW*0.12;
+    const ax = cx + n.slideDir*(w*0.42);
+    pctx.fillStyle = 'rgba(255,255,255,.9)';
+    pctx.beginPath();
+    pctx.moveTo(ax + n.slideDir*aw, y);
+    pctx.lineTo(ax - n.slideDir*aw*0.2, y - ah);
+    pctx.lineTo(ax - n.slideDir*aw*0.2, y + ah);
+    pctx.closePath();
+    pctx.fill();
+  }
   pctx.restore();
 }
 function roundRect(ctx,x,y,w,h,r){
@@ -1177,7 +1267,13 @@ function loop(ts){
   prevT = now;
   if(S.screen!=='game'){ dustUpdate(dt||0.016); return; }
   S.t = now;
+  updateFrame(now, dt);
+}
 
+/* 单帧推进：自动演示 / 漏判 / 长按结算 / 绘制。
+   从 loop 里抽出来，既能脱离 rAF 单独测（build/qa_judge.js 直接调），
+   也让「判定状态机」和「帧调度」分开。 */
+function updateFrame(now, dt){
   // 自动演示
   if(S.auto && S.playing){
     for(const n of S.chart){
@@ -1199,18 +1295,31 @@ function loop(ts){
       showJudge('MISS'); updHud();
       const arena=$('#catArena'); arena.classList.remove('hit','miss'); void arena.offsetWidth; arena.classList.add('miss');
     }
-    // 长条结束奖励
-    if(n.hold && n.holding && now >= n.t + n.hold){
-      n.holding = false; n.done = true;
-      S.score += Math.round(150*(S.fever?1.5:1));
-      const x=V.laneX+V.laneW*(n.lane+0.5);
-      burst(x,V.judgeY,LANE_COLORS[n.lane],8,0.8);
+    // 长按：按住期间持续给分（原来整段没有任何反馈，手感上像「按了没判」）
+    if(n.hold && n.holding && !n.done){
+      const endT = n.t + n.hold;
+      while(now - (n.holdStart + n.holdTick) >= 0.22 && n.holdStart + n.holdTick + 0.22 <= endT){
+        n.holdTick += 0.22;
+        S.score += Math.round(18*(S.fever?1.5:1));
+        const hx = V.laneX + V.laneW*(n.lane+0.5);
+        if(Math.random() < 0.55) burst(hx, V.judgeY, LANE_COLORS[n.lane], 2, 0.45);
+      }
+      if(now >= endT){
+        n.holding = false; n.done = true;
+        S.score += Math.round(150*(S.fever?1.5:1));
+        const x=V.laneX+V.laneW*(n.lane+0.5);
+        burst(x,V.judgeY,LANE_COLORS[n.lane],14,0.95);
+        fxRings.push({x, y:V.judgeY, r:V.laneW*0.2, max:V.laneW*0.95, life:1, color:LANE_COLORS[n.lane]});
+        showJudge('HOLD','HOLD');
+        updHud();
+      }
     }
   }
-  // 长按中断
+  // 长按中断：不判 MISS、不断连，只是没有收尾奖励（比原来宽松）
   for(const n of S.chart){
-    if(n.hold && n.holding && !keysDown[n.lane] && !S.auto){
-      n.holding = false;
+    if(n.hold && n.holding && !n.done && !keysDown[n.lane] && !S.auto){
+      n.holding = false; n.broke = true;
+      showJudge('断','BRK');
     }
   }
 
@@ -1423,6 +1532,7 @@ function start(){
   if(typeof window.__beforeStart === 'function' && window.__beforeStart() === false) return;
   unlockAudio();
   S.chart = chartFor(S.diff);
+  S.slides = buildSlides(S.chart);
   S.judge = {PERFECT:0,GREAT:0,GOOD:0,MISS:0};
   S.combo=0; S.maxCombo=0; S.score=0; S.accSum=0; S.accCount=0; S.fever=false; S.t=0;
   lastScoreShown=0; lyricIdx=-1; parts.length=0; fxRings.length=0;
