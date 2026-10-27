@@ -188,6 +188,80 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const sl = J(slide, 'slide');
   T('滑条链生成且链尾不画箭头', sl.chains === 1 && sl.tailSlide === true && sl.tailSlideDir === 0, `tailDir=${sl.tailSlideDir} midDir=${sl.midDir}`);
 
+  /* ---- 6. 像素捏脸 / 粉丝牌 / 成就 / 模式玩法弹层 ---- */
+  const px1 = await ev(`(function(){
+    try{
+      var f = defaultFace();
+      var dims = Array.isArray(f)&&f.length===16&&Array.isArray(f[0])&&f[0].length===16;
+      var after = faceRects();
+      FACE[8][8] = '#ff0000';
+      var after2 = faceRects();
+      var hasRed = after2.indexOf('#ff0000')>=0;
+      FACE[8][8] = null;
+      renderCat(); drawAv();
+      return JSON.stringify({dims:dims, hasRects:after2.length>0, hasRed:hasRed});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const px = J(px1, 'px');
+  T('像素脸 defaultFace 为 16×16 网格', px.dims, 'dims=' + px.dims);
+  T('像素脸 faceRects 随格子变化生成矩形', px.hasRects && px.hasRed, 'hasRects=' + px.hasRects + ' hasRed=' + px.hasRed);
+
+  const px2 = await ev(`(function(){
+    try{
+      var cv = document.getElementById('faceCanvas');
+      initFaceEditor();
+      var pal = document.getElementById('palette');
+      var sw = pal? pal.children.length : 0;
+      var av = document.getElementById('faceAv');
+      return JSON.stringify({hasCanvas:!!cv, sw:sw, hasAv:!!av});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const px2v = J(px2, 'px2');
+  T('捏脸编辑器画布与调色盘已就绪', px2v.hasCanvas && px2v.sw === 9 && px2v.hasAv, 'sw=' + px2v.sw + ' av=' + px2v.hasAv);
+
+  const fan1 = await ev(`(function(){
+    try{
+      ACH = {}; localStorage.removeItem('qc_ach'); localStorage.removeItem('qc_badge');
+      var u1 = unlock('first');
+      var u2 = unlock('first');
+      renderFans();
+      var bdg = document.getElementById('badges');
+      var ach = document.getElementById('achs');
+      var bCount = bdg? bdg.children.length : 0;
+      var aCount = ach? ach.children.length : 0;
+      openModeInfo();
+      var ov = document.getElementById('modeOverlay');
+      var on = ov.classList.contains('on');
+      var title = document.getElementById('modeTitle').textContent;
+      ov.classList.remove('on');
+      return JSON.stringify({u1:u1, u2:u2, bCount:bCount, aCount:aCount, on:on, title:title});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const fan = J(fan1, 'fan');
+  T('成就解锁首次 true 再次 false', fan.u1 === true && fan.u2 === false, 'u1=' + fan.u1 + ' u2=' + fan.u2);
+  T('粉丝牌 5 枚 / 成就 6 项已渲染', fan.bCount === 5 && fan.aCount === 6, 'badges=' + fan.bCount + ' achs=' + fan.aCount);
+  T('模式玩法弹层可弹出且含「玩法」标题', fan.on === true && /玩法/.test(fan.title), 'on=' + fan.on + ' title=' + fan.title);
+
+  const fin1 = await ev(`(function(){
+    try{
+      ACH = {}; localStorage.removeItem('qc_ach');
+      S.screen='game'; S.mode='classic';
+      S.judge={PERFECT:50,GREAT:0,GOOD:0,MISS:0};
+      S.maxCombo=120; S.score=99999; S.accSum=50; S.accCount=50; S.t=10;
+      feverEver=true;
+      finish();
+      var rb = document.getElementById('resBadge');
+      var rn = document.getElementById('resNick');
+      var disp = rb? getComputedStyle(rb).display : 'none';
+      var txt = rb? rb.textContent : '';
+      var nick = rn? rn.textContent : '';
+      return JSON.stringify({disp:disp, txt:txt, nick:nick, screen:S.screen});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const fin = J(fin1, 'fin');
+  T('结算页粉丝牌显示且标注新成就', fin.disp !== 'none' && /粉丝牌/.test(fin.txt) && /新成就/.test(fin.txt), 'disp=' + fin.disp + ' txt=' + fin.txt);
+  T('结算页昵称渲染', !!fin.nick, 'nick=' + fin.nick);
+
   // 输出
   console.log('\n================ 新功能专项自测 ================');
   out.forEach(([k, n, e]) => console.log(`${k === 'PASS' ? '✅' : '❌'} ${n}${e ? '  —  ' + e : ''}`));
