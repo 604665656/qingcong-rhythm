@@ -675,10 +675,25 @@ function b64ToBuf(uri){
 /* 音轨两种形态都支持：
    内嵌（data: URI，单文件版，离线可玩） / 外链（相对路径，B站 Toy 有 1MB 单文件上限，必须拆出来） */
 function isDataUri(s){ return /^data:/i.test(s); }
+/* 某些托管（如带 ?sharecode= 的分享链接）会把静态资源也挡在访问参数后面，
+   而浏览器按相对路径解析时会丢掉查询串，导致音轨 403。这里把 sharecode 显式补回去。
+   没有 sharecode 的环境（B站 Toy / itch.io / 本地）完全不受影响。 */
+function shareAwareUrl(src){
+  if(isDataUri(src)) return src;
+  try{
+    const u = new URL(src, location.href);
+    if(!u.search){
+      const m = /[?&]sharecode=([^&]+)/.exec(location.search || '');
+      if(m) u.search = 'sharecode=' + m[1];
+    }
+    return u.href;
+  }catch(e){ return src; }
+}
 async function loadAudioBytes(src){
   if(isDataUri(src)) return b64ToBuf(src);
-  const res = await fetch(src, { cache: 'force-cache' });
-  if(!res.ok) throw new Error('读取音轨失败 HTTP ' + res.status);
+  const url = shareAwareUrl(src);
+  const res = await fetch(url, { cache: 'force-cache' });
+  if(!res.ok) throw new Error('读取音轨失败 HTTP ' + res.status + '（' + url + '）');
   return await res.arrayBuffer();
 }
 /* 旧版 Safari 的 decodeAudioData 只支持回调形式（返回值是 undefined），
@@ -700,7 +715,7 @@ function blobUrlFor(buf){
   try{
     return URL.createObjectURL(new Blob([buf], {type:'audio/mpeg'}));
   }catch(e){
-    return AUDIO_SRC;   // 极端情况下直接用原始地址
+    return shareAwareUrl(AUDIO_SRC);   // 极端情况下直接用原始地址
   }
 }
 const nowSec = () => performance.now()/1000;
@@ -747,7 +762,7 @@ async function loadAudio(){
     audioEl.setAttribute('playsinline','');
     audioEl.setAttribute('webkit-playsinline','');
     audioEl.preload = 'auto'; audioEl.volume = S.vol;
-    audioEl.src = bytes ? blobUrlFor(bytes) : AUDIO_SRC;
+    audioEl.src = bytes ? blobUrlFor(bytes) : shareAwareUrl(AUDIO_SRC);
     audioEl.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none;';
     document.body.appendChild(audioEl);
     audioEl.load();

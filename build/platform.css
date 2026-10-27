@@ -120,7 +120,7 @@
 .who-wrap{display:flex;justify-content:center;margin-top:12px;}
 .who{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt-dim);}
 .who img{width:22px;height:22px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,.22);}
-.who .nm{max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.who .nm{max-width:min(52vw,240px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .who.off .dot{width:6px;height:6px;border-radius:50%;background:#ff9aa8;box-shadow:0 0 8px #ff9aa8;}
 .who.on .dot{width:6px;height:6px;border-radius:50%;background:#7ee8d0;box-shadow:0 0 8px #7ee8d0;}
 

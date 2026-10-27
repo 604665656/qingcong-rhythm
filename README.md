@@ -112,9 +112,34 @@ python -m http.server 8080
 
 ## 打包上架 B 站 Toy
 
-1. `index.html` 用相对路径、无外部依赖，直接和一份说明一起压成 zip（≤50MB 即可）
-2. `https://www.bilibili.com/toy/publish/` 提审，首次发布即锁定 slug
-3. 平台层会自动检测宿主：`window.toy` 存在 → 云端模式；否则 → 单机模式，功能自动降级
+Toy 有两条硬限制，直接决定了产物形态：
+
+- **`index.html` 解压后 ≤ 1MB** → 音轨不能内嵌（内嵌版 3.9MB），必须用 `dist/` 分包版
+- **不允许内联脚本/样式/图片** → 但本项目脚本本来就在 `<script>` 里，真正超标的是 base64 音轨；拆出 `song.mp3` 后 index.html 仅 143KB，两条限制同时满足
+
+```bash
+python build/build.py      # 产出 dist/index.html + dist/song.mp3
+# 把这两个文件放在同一层压成 zip，直接投 https://www.bilibili.com/toy/publish/
+```
+
+平台层会自动检测宿主：`window.toy` 存在 → 云端模式（排行榜/云存档/分享）；否则 → 单机模式，功能自动降级为本地存档。
+
+---
+
+## 两个已知的坑
+
+**1. 本机代理会让本地自测连不上 127.0.0.1**
+
+如果环境里设了 `HTTP_PROXY`，无头浏览器和 curl 会把 localhost 也走代理，结果是页面空白、`base` 探测全 false。自测时加 `NO_PROXY`：
+
+```bash
+NO_PROXY=1 PAGE_URL=https://… node build/qa2.js     # 或 http://127.0.0.1:8080/index.html
+curl --noproxy '*' http://127.0.0.1:8080/index.html
+```
+
+**2. 带 `?sharecode=` 的分享链接会把静态资源也挡在参数后面**
+
+`fetch("song.mp3")` 按相对路径解析时会丢掉查询串 → 音轨 403。`shareAwareUrl()` 会把当前页面的 `sharecode` 显式补回去；没有该参数的环境（Toy / itch.io / 本地）完全不受影响。分享时也别忘了带上 `?sharecode=`，只发域名会看到 403「链接不完整」。
 
 ---
 

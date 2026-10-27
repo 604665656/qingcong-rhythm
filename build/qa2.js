@@ -14,7 +14,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const edge = spawn(EDGE, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     '--remote-debugging-port=' + PORT, '--user-data-dir=' + PROF,
-    '--allow-file-access-from-files', '--mute-audio', '--no-proxy-server', '--proxy-bypass-list=*',
+    '--allow-file-access-from-files', '--mute-audio', ...(process.env.NO_PROXY ? ['--no-proxy-server','--proxy-bypass-list=*'] : []),
     '--window-size=1280,860', PAGE
   ], { stdio: 'ignore' });
 
@@ -49,7 +49,19 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   await send('Runtime.enable');
   await send('Page.enable');
-  await sleep(1500);
+  // 启动参数里的 URL 有时还没导航，CDP 就抓到了初始空白页；这里显式导航并等就绪，
+  // 避免把「空文档」误判成「平台层没挂载」。
+  await send('Page.navigate', { url: PAGE });
+  let ready = false;
+  for (let i = 0; i < 80; i++) {
+    const st = await evaluate(`(function(){
+      return (document.readyState === 'complete' && !!document.getElementById('loading')) ? 'ok' : (document.readyState + '|' + document.URL);
+    })()`);
+    if (st === 'ok') { ready = true; break; }
+    await sleep(250);
+  }
+  if (!ready) console.error('页面就绪超时，请检查 PAGE_URL 是否可访问:', PAGE);
+  await sleep(2500);
 
   const out = [];
   const T = (name, ok, extra) => out.push([ok ? 'PASS' : 'FAIL', name, extra === undefined ? '' : String(extra)]);

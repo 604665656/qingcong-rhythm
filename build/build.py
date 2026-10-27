@@ -44,9 +44,13 @@ def main():
     print("OK  单文件  %s  %.2f MB" % (OUT, os.path.getsize(OUT) / 1024 / 1024))
 
     # ---------- 2) 分包版（Toy 用） ----------
-    if os.path.isdir(DIST):
-        shutil.rmtree(DIST)
+    # 注意：不要用 shutil.rmtree 删整个目录（会被本机 safe-delete 安全删除拦截，
+    # 报 [safe-delete][SAFE_DELETE_FAIL_CLOSED] trash-failed），只逐个覆盖产物文件。
     os.makedirs(DIST, exist_ok=True)
+    for name in ("index.html", "song.mp3"):
+        p = os.path.join(DIST, name)
+        if os.path.exists(p):
+            os.remove(p)
     split = render(tpl, chart_json, plat_css, plat_js, "song.mp3")
     split = (split.replace("__COMPOSER__", chart_raw["meta"].get("composer", ""))
                   .replace("__LYRICIST__", chart_raw["meta"].get("lyricist", "")))

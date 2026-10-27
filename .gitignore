@@ -21,3 +21,6 @@
 Thumbs.db
 /web/
 /dist/
+
+# 线上验证截图
+build/live_shot.png
