@@ -188,36 +188,60 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const sl = J(slide, 'slide');
   T('滑条链生成且链尾不画箭头', sl.chains === 1 && sl.tailSlide === true && sl.tailSlideDir === 0, `tailDir=${sl.tailSlideDir} midDir=${sl.midDir}`);
 
-  /* ---- 6. 像素捏脸 / 粉丝牌 / 成就 / 模式玩法弹层 ---- */
-  const px1 = await ev(`(function(){
+  /* ---- 6. B 站身份 / 粉丝牌 / 成就 / 弹幕 / 玩法弹层 / 保存退出 ---- */
+  // 合规：Toy 不允许用户自建昵称头像、禁止自由文本输入（UGC）
+  const id1 = await ev(`(function(){
     try{
-      var f = defaultFace();
-      var dims = Array.isArray(f)&&f.length===16&&Array.isArray(f[0])&&f[0].length===16;
-      var after = faceRects();
-      FACE[8][8] = '#ff0000';
-      var after2 = faceRects();
-      var hasRed = after2.indexOf('#ff0000')>=0;
-      FACE[8][8] = null;
-      renderCat(); drawAv();
-      return JSON.stringify({dims:dims, hasRects:after2.length>0, hasRed:hasRed});
+      var hasNickInput = !!document.getElementById('nickInput');
+      var hasDmInput = !!document.getElementById('msgInput');
+      var presetNicks = (typeof PRESET_NICKS!=='undefined') ? PRESET_NICKS.length : 0;
+      var presetDm = (typeof PRESET_DM!=='undefined') ? PRESET_DM.length : 0;
+      fetchMy();
+      var nm = document.getElementById('myName');
+      var img = document.getElementById('myAvatar');
+      return JSON.stringify({hasNickInput:hasNickInput, hasDmInput:hasDmInput,
+        presetNicks:presetNicks, presetDm:presetDm,
+        name: nm? nm.textContent : '', nick: S.nick||'', from: MY? MY.from : ''});
     }catch(e){ return 'ERR:'+e.message; }
   })()`);
-  const px = J(px1, 'px');
-  T('像素脸 defaultFace 为 16×16 网格', px.dims, 'dims=' + px.dims);
-  T('像素脸 faceRects 随格子变化生成矩形', px.hasRects && px.hasRed, 'hasRects=' + px.hasRects + ' hasRed=' + px.hasRed);
+  const ident = J(id1, 'ident');
+  T('已移除自由昵称输入框（合规）', ident.hasNickInput === false, 'nickInput=' + ident.hasNickInput);
+  T('已移除自由弹幕输入框（合规，无 UGC）', ident.hasDmInput === false, 'msgInput=' + ident.hasDmInput);
+  T('昵称用 SDK 或系统预置候选', ident.presetNicks >= 8 && !!ident.nick, 'preset=' + ident.presetNicks + ' nick=' + ident.nick + ' from=' + ident.from);
 
-  const px2 = await ev(`(function(){
+  const dm1 = await ev(`(function(){
     try{
-      var cv = document.getElementById('faceCanvas');
-      initFaceEditor();
-      var pal = document.getElementById('palette');
-      var sw = pal? pal.children.length : 0;
-      var av = document.getElementById('faceAv');
-      return JSON.stringify({hasCanvas:!!cv, sw:sw, hasAv:!!av});
+      localStorage.removeItem('qc_msgs');
+      buildDress();                       // 预置弹幕在打开装扮页时装配
+      var chips = document.getElementById('dmPresets');
+      var n = chips? chips.children.length : 0;
+      if(n){ chips.children[0].click(); }
+      var saved = loadMsgs().length;
+      // 手动飘一条，验证弹幕层真的能生成节点
+      stopDanmaku(); startDanmaku();
+      var layer = document.getElementById('danmaku');
+      var cnt = layer? layer.children.length : 0;
+      stopDanmaku();
+      return JSON.stringify({chips:n, saved:saved, spawned:cnt});
     }catch(e){ return 'ERR:'+e.message; }
   })()`);
-  const px2v = J(px2, 'px2');
-  T('捏脸编辑器画布与调色盘已就绪', px2v.hasCanvas && px2v.sw === 9 && px2v.hasAv, 'sw=' + px2v.sw + ' av=' + px2v.hasAv);
+  const dm = J(dm1, 'dm');
+  T('预置弹幕可点选并写入本地', dm.chips >= 8 && dm.saved >= 1, 'chips=' + dm.chips + ' saved=' + dm.saved);
+  T('弹幕层会生成飘动节点', dm.spawned >= 1, 'spawned=' + dm.spawned);
+
+  const up1 = await ev(`(function(){
+    try{
+      applyUpCard();
+      var img = document.getElementById('upAvatar');
+      var nm = document.getElementById('upName');
+      var f = document.getElementById('followBtn');
+      return JSON.stringify({srcHead: img? String(img.src).slice(0,22) : '',
+        name: nm? nm.textContent : '', href: f? f.getAttribute('href') : ''});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const up = J(up1, 'up');
+  T('UP 主头像已内置为 data URI', /^data:image\//.test(up.srcHead), 'src=' + up.srcHead);
+  T('关注按钮指向 B 站主页（站内，非 b23 短链）', /space\.bilibili\.com/.test(up.href) && !/b23\.tv/.test(up.href), 'href=' + up.href);
 
   const fan1 = await ev(`(function(){
     try{
@@ -261,6 +285,31 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const fin = J(fin1, 'fin');
   T('结算页粉丝牌显示且标注新成就', fin.disp !== 'none' && /粉丝牌/.test(fin.txt) && /新成就/.test(fin.txt), 'disp=' + fin.disp + ' txt=' + fin.txt);
   T('结算页昵称渲染', !!fin.nick, 'nick=' + fin.nick);
+
+  /* ---- 7. 保存 / 退出（此前只有「完成」，且设置不落盘） ---- */
+  const sv1 = await ev(`(function(){
+    try{
+      var ds=!!document.getElementById('dressSave'), de=!!document.getElementById('dressExit');
+      var ss=!!document.getElementById('settingSave'), se=!!document.getElementById('settingExit');
+      // 设置持久化：改偏移 -> 保存 -> 清空 -> 读回
+      localStorage.removeItem('qc_custom');
+      S.offset = 77; S.speed = 1.25; S.vol = 0.55; saveCustom();
+      S.offset = 0; S.speed = 1; S.vol = 0.8; loadCustom();
+      var got = {offset:S.offset, speed:S.speed, vol:S.vol};
+      // 退出还原：快照 -> 改 -> restore
+      optSnap = snapOpts();
+      S.offset = -120; S.theme='sakura';
+      restoreOpts(optSnap);
+      var back = (S.offset === optSnap.offset && S.theme === optSnap.theme);
+      return JSON.stringify({ds:ds, de:de, ss:ss, se:se, got:got, back:back});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const sv = J(sv1, 'sv');
+  T('装扮页有独立的保存与退出按钮', sv.ds && sv.de, 'save=' + sv.ds + ' exit=' + sv.de);
+  T('设置页有独立的保存与退出按钮', sv.ss && sv.se, 'save=' + sv.ss + ' exit=' + sv.se);
+  T('判定偏移/速度/音量现在会落盘（重启不丢）', sv.got.offset === 77 && Math.abs(sv.got.speed - 1.25) < 1e-6 && Math.abs(sv.got.vol - 0.55) < 1e-6,
+    'offset=' + sv.got.offset + ' speed=' + sv.got.speed + ' vol=' + sv.got.vol);
+  T('退出能还原未保存的修改', sv.back === true, 'back=' + sv.back);
 
   // 输出
   console.log('\n================ 新功能专项自测 ================');

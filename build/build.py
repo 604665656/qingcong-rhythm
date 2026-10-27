@@ -24,6 +24,18 @@ def render(tpl, chart, plat_css, plat_js, audio_value):
     return html
 
 
+def inject_up(html):
+    """UP 主头像内嵌 data URI（约 3KB）。
+
+    B 站 api.bilibili.com 未开放 CORS，浏览器直连取不到，所以头像必须随包内置，
+    联网时再尝试刷新。素材缺失时退化为透明占位，不能让 img 变裂图。"""
+    av = os.path.join(BUILD, "up_avatar.webp")
+    if os.path.exists(av):
+        b = base64.b64encode(open(av, "rb").read()).decode("ascii")
+        return html.replace("__UP_AVATAR__", "data:image/webp;base64," + b)
+    return html.replace("__UP_AVATAR__", "")
+
+
 def main():
     tpl = open(os.path.join(BUILD, "game.template.html"), encoding="utf-8").read()
     chart_raw = json.load(open(os.path.join(BUILD, "chart.json"), encoding="utf-8"))
@@ -43,6 +55,7 @@ def main():
     single = render(tpl, chart_json, plat_css, plat_js, "data:audio/mpeg;base64," + b64)
     single = (single.replace("__COMPOSER__", meta0.get("composer", ""))
                     .replace("__LYRICIST__", meta0.get("lyricist", "")))
+    single = inject_up(single)
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(single)
     print("OK  单文件  %s  %.2f MB" % (OUT, os.path.getsize(OUT) / 1024 / 1024))
@@ -58,6 +71,7 @@ def main():
     split = render(tpl, chart_json, plat_css, plat_js, "song.mp3")
     split = (split.replace("__COMPOSER__", meta0.get("composer", ""))
                   .replace("__LYRICIST__", meta0.get("lyricist", "")))
+    split = inject_up(split)
     with open(os.path.join(DIST, "index.html"), "w", encoding="utf-8") as f:
         f.write(split)
     shutil.copyfile(mp3, os.path.join(DIST, "song.mp3"))

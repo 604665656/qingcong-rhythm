@@ -208,19 +208,32 @@
   .cat-art.sing .eyes{ transform-box: fill-box; transform-origin: center; animation: eyeBlink 2.4s ease-in-out infinite; }
   @keyframes eyeBlink{ 0%,90%,100%{ transform: none;} 95%{ transform: scaleY(.08);} }
 
-  /* 像素捏脸编辑器 */
-  .face-canvas{ width:180px;height:180px;image-rendering:pixelated;border-radius:10px;
-    background:repeating-conic-gradient(#2a2440 0% 25%,#241f38 0% 50%) 50%/16px 16px;cursor:crosshair;
-    touch-action:none;display:block; }
-  .palette{ display:flex;flex-wrap:wrap;gap:6px;margin-top:8px; }
-  .swatch{ width:22px;height:22px;border-radius:6px;border:2px solid rgba(255,255,255,.25);cursor:pointer; }
-  .swatch.sel{ outline:2px solid #fff; }
-  .swatch.eraser{ background:repeating-conic-gradient(#888 0% 25%,#bbb 0% 50%) 50%/8px 8px; }
-  .face-av{ width:60px;height:60px;border-radius:50%;background:#1c1830;image-rendering:pixelated;vertical-align:middle; }
+  /* UP 主卡片（B 站昵称 + 头像） */
+  .up-card{ display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12); }
+  .up-av{ width:60px;height:60px;border-radius:50%;object-fit:cover;background:#241f38;
+    border:2px solid rgba(255,255,255,.28);flex:none; }
+  .up-meta{ min-width:0; }
+  .up-name{ font-size:15px;font-weight:700;color:#fff; }
+  .up-sub{ font-size:11px;color:var(--txt-dim);margin-top:2px;line-height:1.45; }
   .mini{ padding:6px 12px;font-size:12px; }
   .note{ font-size:11px;color:var(--txt-dim);margin-top:4px;line-height:1.5; }
 
-  /* 粉丝中心：粉丝牌 / 成就 / 留言墙 */
+  /* 弹幕层（游戏内飘过的留言） */
+  .danmaku{ position:absolute;left:0;right:0;top:15%;height:20%;pointer-events:none;overflow:hidden;z-index:4; }
+  .danmaku.paused .dm{ animation-play-state:paused; }
+  .dm{ position:absolute;left:100%;white-space:nowrap;font-size:13px;font-weight:600;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 10px rgba(0,0,0,.55);will-change:transform; }
+  .dm b{ color:var(--amber);font-weight:700; }
+  @keyframes dmFly{ from{transform:translateX(0);} to{transform:translateX(calc(-100vw - 100%));} }
+
+  /* 保存提示 toast */
+  .toast{ position:fixed;left:50%;bottom:8%;transform:translate(-50%,14px);z-index:999;
+    padding:10px 18px;border-radius:999px;background:rgba(20,16,34,.94);color:#fff;font-size:13px;
+    border:1px solid rgba(255,255,255,.18);opacity:0;transition:opacity .22s,transform .22s;pointer-events:none; }
+  .toast.on{ opacity:1;transform:translate(-50%,0); }
+
+  /* 粉丝中心：粉丝牌 / 成就 / 弹幕 */
   .badges,.achs{ display:flex;flex-wrap:wrap;gap:6px; }
   .badge{ font-size:12px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.08);
     border:1px solid rgba(255,255,255,.14);cursor:pointer; }
@@ -231,9 +244,7 @@
   .ach.lock{ opacity:.4; }
   .msg-input{ width:100%;height:48px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
     border-radius:8px;color:#fff;padding:6px 8px;font-size:13px;resize:none; }
-  .wall{ margin-top:8px;max-height:120px;overflow:auto;display:flex;flex-direction:column;gap:6px; }
-  .wall .m{ font-size:12px;background:rgba(255,255,255,.05);border-radius:8px;padding:6px 8px; }
-  .wall .m b{ color:var(--amber);margin-right:6px; }
+  .dm-count{ font-size:11px;color:var(--txt-dim);margin-top:6px; }
 
   /* 模式玩法弹层 */
   .mode-hint{ font-size:14px;color:var(--amber);margin:6px 0;font-weight:700; }
@@ -488,7 +499,9 @@ __PLATFORM_CSS__
     <div id="judgeText"></div>
     <div class="cat-arena" id="catArena"><div class="cat-aura"></div><div class="cat-art" id="catGame"></div></div>
     <div class="keys-hint"><span>D</span><span>F</span><span>J</span><span>K · 长按可延音</span></div>
+    <div class="danmaku" id="danmaku"></div>
   </section>
+  <div class="toast" id="toast"></div>
 
   <!-- ================= 结算 ================= -->
   <section class="screen" id="resultScreen">
@@ -551,7 +564,10 @@ __PLATFORM_CSS__
       <div class="row"><label><input type="range" id="sfxRange" min="0" max="100" step="1" value="50" /></label><span style="font-size:10.5px;color:var(--txt-dim)">贴合歌曲调性，MISS 不出声</span></div>
       <div class="row"><label>判定音开关</label><div class="switch on" id="sfxSw"></div></div>
       <div class="row"><label>自动演示</label><div class="switch" id="autoSw"></div></div>
-      <div class="panel-actions"><button class="btn ghost" id="settingClose" style="flex:1">完成</button></div>
+      <div class="panel-actions">
+        <button class="btn ghost" id="settingExit">退出</button>
+        <button class="btn" id="settingSave">保存</button>
+      </div>
     </div>
   </div>
 
@@ -577,43 +593,53 @@ __PLATFORM_CSS__
     <div class="panel glass">
       <h3>装扮 · 个性化</h3>
       <div class="dress-section"><label>主题配色</label><div class="themes" id="themes"></div></div>
-      <div class="dress-section"><label>玩家昵称（即粉丝昵称）</label>
-        <input class="nick-input" id="nickInput" maxlength="12" placeholder="给自己起个名字" />
+      <div class="dress-section"><label>我的 B 站身份</label>
+        <div class="up-card">
+          <img id="myAvatar" class="up-av" alt="我的头像" />
+          <div class="up-meta">
+            <div class="up-name" id="myName">—</div>
+            <div class="up-sub" id="mySub">点下面按钮获取 B 站昵称和头像</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn ghost mini" id="myFetch">获取 B 站昵称和头像</button>
+          <button class="btn ghost mini" id="myRand">换一个</button>
+        </div>
+        <div class="note">昵称与头像取自你的 B 站账号；未连接 B 站时用系统随机昵称。Toy 规范不允许自定义昵称与自由输入。</div>
       </div>
       <div class="dress-section"><label>判定音</label>
         <div class="row"><input type="range" id="sfxRange2" min="0" max="100" step="1" value="50" /></div>
         <div class="row"><label style="font-size:12px;color:var(--txt-dim)">贴合歌曲调性合成，MISS 不出声</label></div>
       </div>
-      <div class="dress-section"><label>哈士喵捏脸（像素级）</label>
-        <canvas id="faceCanvas" width="256" height="256" class="face-canvas"></canvas>
-        <div class="palette" id="palette"></div>
-        <div class="row">
-          <button class="btn ghost mini" id="faceRand">随机</button>
-          <button class="btn ghost mini" id="faceClear">清空</button>
-          <button class="btn ghost mini" id="faceReset">还原默认</button>
+      <div class="dress-section"><label>UP 主 · B 站身份</label>
+        <div class="up-card">
+          <img id="upAvatar" class="up-av" alt="UP 主头像" />
+          <div class="up-meta">
+            <div class="up-name" id="upName">未获取</div>
+            <div class="up-sub" id="upSub">点下面按钮获取 B 站昵称和头像</div>
+          </div>
         </div>
-        <div class="note">在格子上点按/拖拽绘制，捏出的脸会实时显示在哈士喵脸上，也作为你的粉丝头像。</div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn ghost mini" id="upFetch">获取 B 站昵称和头像</button>
+          <a class="btn ghost mini" id="followBtn" href="https://space.bilibili.com/298813" target="_blank" rel="noopener">去主页关注 ↗</a>
+        </div>
+        <div class="note">头像与昵称已内置到游戏里，离线点击也能获取；联网时会自动尝试拉取最新资料。查询「是否已关注」需要 B 站账号授权（OAuth），本地版读不到，所以只提供跳转关注入口。</div>
       </div>
       <div class="dress-section"><label>粉丝中心</label>
-        <div class="row" style="align-items:center;gap:10px;">
-          <canvas id="faceAv" width="96" height="96" class="face-av"></canvas>
-          <span id="fansSummary" style="font-size:12px;color:var(--txt-dim)">—</span>
-        </div>
+        <div style="margin-top:2px;"><span id="fansSummary" style="font-size:12px;color:var(--txt-dim)">—</span></div>
         <div style="margin-top:6px;"><label style="font-size:12px;color:var(--txt-dim)">粉丝牌（由成就解锁）</label>
           <div class="badges" id="badges"></div></div>
         <div style="margin-top:8px;"><label style="font-size:12px;color:var(--txt-dim)">成就</label>
           <div class="achs" id="achs"></div></div>
-        <div style="margin-top:8px;"><label style="font-size:12px;color:var(--txt-dim)">留言墙（本地保存）</label>
-          <textarea id="msgInput" class="msg-input" maxlength="60" placeholder="对这首歌说点什么…"></textarea>
-          <div class="row" style="margin-top:6px;"><button class="btn ghost mini" id="msgSend">留言</button></div>
-          <div class="wall" id="wall"></div>
-        </div>
-        <div style="margin-top:8px;"><label style="font-size:12px;color:var(--txt-dim)">关注 UP 主</label>
-          <a class="btn ghost mini" id="followBtn" href="https://space.bilibili.com/298813" target="_blank" rel="noopener">去 B 站关注我 / 逛主页 ↗</a>
-          <div class="note">查询「是否已关注」需要 B 站账号授权（OAuth），当前本地版无法读取；点上面按钮可跳转到 UP 主主页关注。</div>
+        <div style="margin-top:8px;"><label style="font-size:12px;color:var(--txt-dim)">弹幕（点选后会在游戏里飘过）</label>
+          <div class="badges" id="dmPresets"></div>
+          <div class="dm-count" id="dmCount"></div>
         </div>
       </div>
-      <div class="panel-actions"><button class="btn ghost" id="dressClose" style="flex:1">完成</button></div>
+      <div class="panel-actions">
+        <button class="btn ghost" id="dressExit">退出</button>
+        <button class="btn" id="dressSave">保存</button>
+      </div>
     </div>
   </div>
 
@@ -760,72 +786,141 @@ const CAT_SVG_BASE = `
   </g>
 </svg>`;
 
-/* ---------- 像素捏脸（哈士喵面部）+ 粉丝头像 ---------- */
-const FACE_PAL = [
-  {c:'#ffffff', n:'白毛'}, {c:'#9d9ab2', n:'灰斑'}, {c:'#ffc7d1', n:'粉颊'},
-  {c:'#6fc1f7', n:'蓝眼'}, {c:'#ffd166', n:'暖黄'}, {c:'#ff8fb1', n:'樱粉'},
-  {c:'#42e8d0', n:'青葱'}, {c:'#a78bfa', n:'暮紫'}, {c:null, n:'橡皮', eraser:true}
-];
-let FACE = null;            // 16×16 颜色网格（null=透明）
-let curFaceCol = FACE_PAL[1].c;
-const FACE_N = 16;
-function defaultFace(){
-  // 一个可爱的「青葱」 markings：额前小三角 + 眼下两点腮红
-  const g = Array.from({length:FACE_N}, ()=>Array(FACE_N).fill(null));
-  const put=(r,c,col)=>{ if(r>=0&&r<FACE_N&&c>=0&&c<FACE_N) g[r][c]=col; };
-  for(let c=6;c<=9;c++) put(4,c,'#42e8d0');          // 额头小横
-  put(3,7,'#42e8d0'); put(3,8,'#42e8d0');
-  for(let r=5;r<=7;r++){ put(r,7,'#42e8d0'); put(r,8,'#42e8d0'); }
-  for(let r=9;r<=11;r++){ put(r,5,'#ffc7d1'); put(r,10,'#ffc7d1'); } // 腮红
-  return g;
-}
-function loadFace(){ try{ const r=localStorage.getItem('qc_face'); FACE = r?JSON.parse(r):defaultFace(); }catch(e){ FACE=defaultFace(); } }
-function saveFace(){ try{ localStorage.setItem('qc_face', JSON.stringify(FACE)); }catch(e){} }
-/* 把 16×16 网格映射成覆盖猫脸的 SVG 矩形（viewBox 脸部区域） */
-function faceRects(){
-  if(!FACE) return '';
-  const x0=58, y0=58, w=104, h=92, cw=w/FACE_N, ch=h/FACE_N;
-  let s='';
-  for(let r=0;r<FACE_N;r++) for(let c=0;c<FACE_N;c++){
-    const col=FACE[r][c]; if(!col) continue;
-    s += '<rect x="'+(x0+c*cw).toFixed(1)+'" y="'+(y0+r*ch).toFixed(1)+'" width="'+(cw+0.6).toFixed(1)+'" height="'+(ch+0.6).toFixed(1)+'" fill="'+col+'" rx="1.4" opacity="0.92"/>';
-  }
-  return s;
-}
-function catSVG(){ return CAT_SVG_BASE.replace('</svg>', '<g id="faceArt">'+faceRects()+'</g></svg>'); }
+/* ---------- 哈士喵形象渲染 ---------- */
 function renderCat(){
-  document.querySelectorAll('.cat-art').forEach(n=>{ n.innerHTML = catSVG(); });
+  document.querySelectorAll('.cat-art').forEach(n=>{ n.innerHTML = CAT_SVG_BASE; });
   const tc = document.querySelector('#catTitle svg'); if(tc) tc.classList.add('float');
 }
-function drawAv(){
-  const cv=$('#faceAv'); if(!cv) return; const ctx=cv.getContext('2d'); const SZ=cv.width/FACE_N;
-  ctx.clearRect(0,0,cv.width,cv.height);
-  for(let r=0;r<FACE_N;r++) for(let c=0;c<FACE_N;c++){ const col=FACE[r][c]; if(!col) continue; ctx.fillStyle=col; ctx.fillRect(c*SZ,r*SZ,SZ,SZ); }
+
+/* ---------- toast 轻量提示 ---------- */
+let toastTimer = null;
+function toast(msg){
+  const t = $('#toast'); if(!t) return;
+  t.textContent = msg; t.classList.add('on');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('on'), 1700);
 }
-function initFaceEditor(){
-  const cv=$('#faceCanvas'); if(!cv) return; const ctx=cv.getContext('2d'); const SZ=cv.width/FACE_N;
-  const pal=$('#palette'); if(pal && !pal.children.length){
-    FACE_PAL.forEach((p,i)=>{ const s=document.createElement('div'); s.className='swatch'+(p.eraser?' eraser':''); if(p.c) s.style.background=p.c; s.title=p.n;
-      s.onclick=()=>{ curFaceCol = p.c; [...pal.children].forEach(x=>x.classList.remove('sel')); s.classList.add('sel'); };
-      pal.appendChild(s);
-    });
-    pal.children[1].classList.add('sel'); // 默认灰斑
+
+/* ---------- UP 主 B 站身份（昵称 + 头像） ---------- */
+/* 头像与昵称随构建产物内置，离线点击即可获取；联网时再尝试拉最新资料。
+   注意：api.bilibili.com 未开放 CORS，浏览器直连多数情况下会被拦，
+   因此失败必须静默回退到内置数据，不能因为取不到就空白。 */
+const UP_MID = '298813';
+const UP_BUNDLED = { mid: UP_MID, name: '许许许许许丶若辰', avatar: '__UP_AVATAR__' };
+let UP = null;
+function loadUp(){ try{ const r=localStorage.getItem('qc_up'); UP = r?JSON.parse(r):null; }catch(e){ UP=null; } }
+function saveUp(){ try{ localStorage.setItem('qc_up', JSON.stringify(UP)); }catch(e){} }
+function applyUpCard(){
+  const img=$('#upAvatar'), nm=$('#upName'), sub=$('#upSub');
+  const d = UP || UP_BUNDLED;
+  if(img){
+    img.onerror = ()=>{ img.onerror=null; img.src = UP_BUNDLED.avatar; };
+    img.src = d.avatar || UP_BUNDLED.avatar;
   }
-  const draw=()=>{ ctx.clearRect(0,0,cv.width,cv.height);
-    for(let r=0;r<FACE_N;r++) for(let c=0;c<FACE_N;c++){ const col=FACE[r][c]; if(!col) continue; ctx.fillStyle=col; ctx.fillRect(c*SZ,r*SZ,SZ,SZ); } };
-  let painting=false;
-  const pos=e=>{ const rc=cv.getBoundingClientRect(); return { x:Math.floor((e.clientX-rc.left)/rc.width*FACE_N), y:Math.floor((e.clientY-rc.top)/rc.height*FACE_N) }; };
-  const paint=e=>{ const {x,y}=pos(e); if(x<0||y<0||x>=FACE_N||y>=FACE_N) return; FACE[y][x] = (curFaceCol===null)?null:curFaceCol; draw(); renderCat(); drawAv(); saveFace(); };
-  cv.addEventListener('pointerdown', e=>{ painting=true; paint(e); });
-  cv.addEventListener('pointermove', e=>{ if(painting) paint(e); });
-  window.addEventListener('pointerup', ()=>painting=false);
-  cv.addEventListener('contextmenu', e=>e.preventDefault());
-  $('#faceRand').onclick = ()=>{ const cols=FACE_PAL.filter(p=>p.c).map(p=>p.c);
-    for(let r=0;r<FACE_N;r++) for(let c=0;c<FACE_N;c++) FACE[r][c] = Math.random()<0.32 ? cols[Math.random()*cols.length|0] : null; draw(); renderCat(); drawAv(); saveFace(); };
-  $('#faceClear').onclick = ()=>{ for(let r=0;r<FACE_N;r++) FACE[r].fill(null); draw(); renderCat(); drawAv(); saveFace(); };
-  $('#faceReset').onclick = ()=>{ FACE=defaultFace(); draw(); renderCat(); drawAv(); saveFace(); };
-  draw();
+  if(nm) nm.textContent = d.name || UP_BUNDLED.name;
+  if(sub){
+    const bits = ['UID ' + UP_MID];
+    if(d.fans) bits.push(Number(d.fans).toLocaleString('en-US') + ' 粉丝');
+    bits.push('《嘶恍而过的青葱岁月》');
+    sub.textContent = bits.join(' · ');
+  }
 }
+function fetchUp(){
+  applyUpCard();                                   // 先显示内置值，保证离线也立刻有东西
+  const btn = $('#upFetch'); if(btn) btn.textContent = '获取中…';
+  const done = ok => { if(btn) btn.textContent = '获取 B 站昵称和头像';
+    toast(ok ? '已更新 B 站资料' : '已使用内置资料（网络未通）'); };
+  try{
+    fetch('https://api.bilibili.com/x/web-interface/card?mid=' + UP_MID, {cache:'no-store'})
+      .then(r=>r.json())
+      .then(j=>{
+        const c = j && j.data && j.data.card;
+        if(c && c.name){
+          UP = { mid: UP_MID, name: c.name, avatar: (c.face || UP_BUNDLED.avatar), fans: c.fans || 0 };
+          saveUp(); applyUpCard(); done(true);
+        } else done(false);
+      })
+      .catch(()=>done(false));
+  }catch(e){ done(false); }
+}
+
+/* ---------- 我的 B 站身份（昵称 + 头像） ---------- */
+/* 合规：Toy 不允许用户自建昵称/头像，只能取 SDK 用户信息或系统预置候选，
+   因此这里没有自由输入框，取不到 SDK 就随机给一个预置昵称。 */
+const PRESET_NICKS = ['青葱新苗','路过的喵','咔咔打鼓','全连挑战者','太鼓萌新',
+                      '青葱老粉','节奏旅人','喵喵突击手','追光少年','青葱节拍'];
+let MY = null;                                  // {name, avatar, from:'sdk'|'preset'}
+function loadMy(){ try{ MY = JSON.parse(localStorage.getItem('qc_my')||'null'); }catch(e){ MY=null; } }
+function saveMy(){ try{ localStorage.setItem('qc_my', JSON.stringify(MY)); }catch(e){} }
+function pickPresetNick(){ return PRESET_NICKS[Math.floor(Math.random()*PRESET_NICKS.length)]; }
+function applyMy(){
+  const img=$('#myAvatar'), nm=$('#myName'), sub=$('#mySub');
+  const name = (MY && MY.name) || pickPresetNick();
+  if(!MY){ MY = { name: name, avatar: '', from: 'preset' }; saveMy(); }
+  if(nm) nm.textContent = name;
+  if(img){
+    img.onerror = ()=>{ img.style.visibility='hidden'; };
+    if(MY.avatar){ img.style.visibility='visible'; img.src = MY.avatar; }
+    else img.style.visibility='hidden';
+  }
+  if(sub) sub.textContent = MY.from==='sdk' ? '来自你的 B 站账号' : '系统随机昵称（未连接 B 站）';
+  S.nick = name;
+  const nl=$('#nickLbl'); if(nl) nl.textContent = name;
+  const fs=$('#fansSummary');
+  if(fs) fs.textContent = name + ' · 粉丝牌「' + (BADGES.find(b=>b.id===SEL_BADGE)||BADGES[0]).name + '」';
+}
+function fetchMy(){
+  const btn=$('#myFetch'); if(btn) btn.textContent='获取中…';
+  const done=(msg)=>{ if(btn) btn.textContent='获取 B 站昵称和头像'; toast(msg); };
+  try{
+    const P = window.PLAT;
+    const u = P && P.user;
+    if(u && (u.nickname || u.name)){
+      MY = { name: u.nickname || u.name, avatar: u.avatar || u.face || '', from:'sdk' };
+      saveMy(); applyMy(); renderFans(); done('已获取 B 站昵称和头像');
+    } else {
+      MY = { name: pickPresetNick(), avatar:'', from:'preset' };
+      saveMy(); applyMy(); renderFans(); done('未连接 B 站，已用随机昵称');
+    }
+  }catch(e){ done('获取失败，已用随机昵称'); }
+}
+function randMy(){ MY = { name: pickPresetNick(), avatar: MY && MY.avatar ? MY.avatar : '', from: MY && MY.from==='sdk' ? 'sdk' : 'preset' };
+  saveMy(); applyMy(); renderFans(); toast('换了个昵称'); }
+
+/* ---------- 预置弹幕（禁止自由输入，只能点选） ---------- */
+const PRESET_DM = ['这首歌太上头了','青春就是这样啊','手速跟不上啦','再来亿遍',
+                   '前排围观','全连冲！','太鼓敲起来','旋律好熟悉','青葱岁月万岁','喵喵助我'];
+
+/* ---------- 弹幕（玩家留言在游戏里飘过） ---------- */
+let dmTimer = null, dmIdx = 0;
+function dmSpawn(text, nick){
+  const layer = $('#danmaku'); if(!layer || !text) return;
+  const el = document.createElement('div');
+  el.className = 'dm';
+  el.innerHTML = '<b></b><span></span>';
+  el.querySelector('b').textContent = (nick || '无名氏') + '：';
+  el.querySelector('span').textContent = text;
+  const band = layer.clientHeight || 90;
+  el.style.top = Math.floor(Math.random() * Math.max(8, band - 22)) + 'px';
+  el.style.animation = 'dmFly ' + (7 + Math.random() * 4).toFixed(1) + 's linear forwards';
+  el.addEventListener('animationend', ()=>el.remove());
+  layer.appendChild(el);
+}
+function startDanmaku(){
+  stopDanmaku();
+  const layer = $('#danmaku'); if(!layer) return;
+  layer.innerHTML = ''; layer.classList.remove('paused');
+  const msgs = loadMsgs(); if(!msgs.length) return;
+  dmIdx = 0;
+  const tick = ()=>{ const m = msgs[dmIdx % msgs.length]; dmIdx++; dmSpawn(m.text, m.nick); };
+  tick();
+  dmTimer = setInterval(tick, 2400);
+}
+function stopDanmaku(){
+  if(dmTimer){ clearInterval(dmTimer); dmTimer = null; }
+  const l = $('#danmaku'); if(l){ l.innerHTML = ''; l.classList.remove('paused'); }
+}
+function setDanmakuPaused(p){ const l = $('#danmaku'); if(l) l.classList.toggle('paused', !!p); }
 
 /* ---------- 粉丝牌 / 成就 ---------- */
 const ACHS = [
@@ -861,11 +956,7 @@ function renderFans(){
       el.className='ach'+(ok?'':' lock'); el.textContent=(ok?'★ ':'☆ ')+a.name; el.title=a.need; ac.appendChild(el); });
   }
   const fs=$('#fansSummary'); if(fs) fs.textContent = (S.nick||'无名氏') + ' · 粉丝牌「' + (BADGES.find(b=>b.id===SEL_BADGE)||BADGES[0]).name + '」';
-  drawAv();
-  const wall=$('#wall'); if(wall){ const msgs=loadMsgs(); wall.innerHTML='';
-    msgs.slice(-12).reverse().forEach(m=>{ const d=document.createElement('div'); d.className='m';
-      d.innerHTML='<b></b><span></span>'; d.querySelector('b').textContent=m.nick||'无名氏'; d.querySelector('span').textContent=m.text; wall.appendChild(d); });
-  }
+  const dc=$('#dmCount'); if(dc){ const n=loadMsgs().length; dc.textContent = n ? ('已存 '+n+' 条弹幕，开始游戏后会在画面上方飘过') : '还没有弹幕，发一条试试'; }
 }
 function loadMsgs(){ try{ return JSON.parse(localStorage.getItem('qc_msgs')||'[]'); }catch(e){ return []; } }
 function saveMsg(text){ const msgs=loadMsgs(); msgs.push({nick:S.nick||'无名氏', text}); localStorage.setItem('qc_msgs', JSON.stringify(msgs.slice(-50))); }
@@ -2061,22 +2152,23 @@ function start(){
   resize();
   pausedAt = 0; prevT = 0;
   startAudio(0);
+  startDanmaku();
   if(!seenModes[S.mode]){ seenModes[S.mode]=1; saveSeen(); openModeInfo(); S.modePaused=true; pause(); }
   if(!raf) raf = requestAnimationFrame(loop);
 }
 function pause(){
   if(S.screen!=='game' || S.paused) return;
   S.paused = true; pausedAt = songTime(); stopAudio();
-  $('#pauseOverlay').classList.add('on');
+  $('#pauseOverlay').classList.add('on'); setDanmakuPaused(true);
 }
 function resume(){
   if(!S.paused) return;
   S.paused = false; $('#pauseOverlay').classList.remove('on');
-  startAudio(pausedAt);
+  setDanmakuPaused(false); startAudio(pausedAt);
 }
 function finish(){
   if(S.screen==='result') return;
-  stopAudio(); S.playing=false;
+  stopAudio(); S.playing=false; stopDanmaku();
   const total = S.judge.PERFECT+S.judge.GREAT+S.judge.GOOD+S.judge.MISS;
   const acc = total? (S.accSum/S.accCount*100):0;
   let rank='C';
@@ -2224,25 +2316,80 @@ function buildDress(){
     wrap.appendChild(el);
   });
   const ni = $('#nickInput');
-  if(ni){
-    ni.value = S.nick || '';
-    ni.oninput = ()=>{ S.nick = ni.value.trim(); saveCustom(); $('#nickLbl') && ($('#nickLbl').textContent = S.nick); renderFans(); };
+  if(ni) ni.value = S.nick || '';      // 合规：不再提供自由输入，仅作只读展示
+  // 我的 B 站身份（SDK 或系统预置）
+  const mf=$('#myFetch'); if(mf) mf.onclick = ()=> fetchMy();
+  const mr=$('#myRand');  if(mr) mr.onclick = ()=> randMy();
+  applyMy();
+  // 预置弹幕点选（禁止自由文本输入）
+  const dp=$('#dmPresets');
+  if(dp && !dp.children.length){
+    PRESET_DM.forEach(t=>{
+      const el=document.createElement('div');
+      el.className='badge'; el.textContent=t;
+      el.onclick=()=>{ saveMsg(t); renderFans(); toast('弹幕已添加：'+t); };
+      dp.appendChild(el);
+    });
   }
-  // 粉丝留言发送
-  const ms=$('#msgSend'); if(ms) ms.onclick=()=>{ const ta=$('#msgInput'); const v=(ta.value||'').trim(); if(v){ saveMsg(v); ta.value=''; renderFans(); } };
-  initFaceEditor();
+  const uf=$('#upFetch'); if(uf) uf.onclick = ()=> fetchUp();
+  applyUpCard();
   renderFans();
 }
+/* 保存全部个性化与游玩设置（判定偏移/速度/音量等此前只存在内存里，重启会丢） */
 function saveCustom(){
   try{
-    localStorage.setItem('qc_custom', JSON.stringify({theme:S.theme, nick:S.nick}));
+    localStorage.setItem('qc_custom', JSON.stringify({
+      theme:S.theme, nick:S.nick, offset:S.offset, speed:S.speed, vol:S.vol,
+      sfxVol:S.sfxVol, sfxOn:S.sfxOn, auto:S.auto
+    }));
   }catch(e){}
 }
 function loadCustom(){
   try{
     const raw = localStorage.getItem('qc_custom');
-    if(raw){ const o = JSON.parse(raw); if(o.theme) S.theme=o.theme; if(o.nick!=null) S.nick=o.nick; }
+    if(!raw) return;
+    const o = JSON.parse(raw);
+    if(o.theme) S.theme=o.theme;
+    if(o.nick!=null) S.nick=o.nick;
+    if(typeof o.offset==='number') S.offset=o.offset;
+    if(typeof o.speed ==='number') S.speed=o.speed;
+    if(typeof o.vol   ==='number') S.vol=o.vol;
+    if(typeof o.sfxVol==='number') S.sfxVol=o.sfxVol;
+    if(typeof o.sfxOn ==='boolean') S.sfxOn=o.sfxOn;
+    if(typeof o.auto  ==='boolean') S.auto=o.auto;
   }catch(e){}
+}
+/* 把 S 里的设置推回界面控件（加载 / 还原时用） */
+function syncOptsUI(){
+  const set=(id,v)=>{ const el=$(id); if(el) el.value=v; };
+  set('#offRange', S.offset); set('#offRange2', S.offset);
+  const ov=$('#offVal'), ov2=$('#offVal2');
+  if(ov) ov.textContent = S.offset+' ms'; if(ov2) ov2.textContent = S.offset+' ms';
+  set('#spdRange', S.speed);
+  const sv=$('#spdVal'); if(sv) sv.textContent = S.speed.toFixed(2).replace(/0$/,'')+'×';
+  set('#volRange', Math.round(S.vol*100));
+  const vv=$('#volVal'); if(vv) vv.textContent = Math.round(S.vol*100)+'%';
+  set('#sfxRange', Math.round(S.sfxVol*100)); set('#sfxRange2', Math.round(S.sfxVol*100));
+  const sv2=$('#sfxVal'); if(sv2) sv2.textContent = Math.round(S.sfxVol*100)+'%';
+  const sw=$('#sfxSw'); if(sw) sw.classList.toggle('on', !!S.sfxOn);
+  const aw=$('#autoSw'); if(aw) aw.classList.toggle('on', !!S.auto);
+  const nl=$('#nickLbl'); if(nl) nl.textContent = S.nick || '';
+}
+/* 面板「保存 / 退出」用的快照与还原 */
+let optSnap = null;
+function snapOpts(){
+  return {theme:S.theme, nick:S.nick, offset:S.offset, speed:S.speed,
+          vol:S.vol, sfxVol:S.sfxVol, sfxOn:S.sfxOn, auto:S.auto};
+}
+function restoreOpts(s){
+  if(!s) return;
+  S.theme=s.theme; S.nick=s.nick; S.offset=s.offset; S.speed=s.speed;
+  S.vol=s.vol; S.sfxVol=s.sfxVol; S.sfxOn=s.sfxOn; S.auto=s.auto;
+  applyTheme(); syncOptsUI(); renderFans();
+  const ni=$('#nickInput'); if(ni) ni.value = S.nick || '';
+  const tw=$('#themes'); if(tw) [...tw.children].forEach((c,i)=>c.classList.toggle('sel', THEMES[i] && THEMES[i].id===S.theme));
+  try{ if(typeof setVolume==='function') setVolume(S.vol);
+       if(typeof Sfx!=='undefined'){ Sfx.setVol(S.sfxVol); Sfx.setEnabled(S.sfxOn); } }catch(e){}
 }
 
 document.addEventListener('visibilitychange', ()=>{
@@ -2263,12 +2410,17 @@ function bindSettings(){
   sfxSw.onclick = ()=>{ S.sfxOn = !S.sfxOn; sfxSw.classList.toggle('on', S.sfxOn); Sfx.setEnabled(S.sfxOn); };
   autoSw.onclick = ()=>{ S.auto = !S.auto; autoSw.classList.toggle('on', S.auto); };
 
-  $('#settingBtn').onclick = ()=> $('#settingOverlay').classList.add('on');
-  $('#settingClose').onclick = ()=> $('#settingOverlay').classList.remove('on');
+  /* 面板统一的「保存 / 退出」：打开时快照，保存落盘，退出还原 */
+  const closeWith = (id, msg)=>{ $(id).classList.remove('on'); toast(msg); };
+  const changed = ()=> !optSnap || JSON.stringify(snapOpts()) !== JSON.stringify(optSnap);
+  $('#settingBtn').onclick = ()=>{ optSnap = snapOpts(); $('#settingOverlay').classList.add('on'); };
+  $('#settingSave').onclick = ()=>{ saveCustom(); closeWith('#settingOverlay', '设置已保存'); };
+  $('#settingExit').onclick = ()=>{ const c = changed(); restoreOpts(optSnap); closeWith('#settingOverlay', c ? '已退出，未保存修改' : '已退出'); };
   $('#helpBtn').onclick = ()=> $('#helpOverlay').classList.add('on');
   $('#helpClose').onclick = ()=> $('#helpOverlay').classList.remove('on');
-  $('#dressBtn').onclick = ()=>{ buildDress(); $('#dressOverlay').classList.add('on'); };
-  $('#dressClose').onclick = ()=> $('#dressOverlay').classList.remove('on');
+  $('#dressBtn').onclick = ()=>{ optSnap = snapOpts(); buildDress(); $('#dressOverlay').classList.add('on'); };
+  $('#dressSave').onclick = ()=>{ saveCustom(); closeWith('#dressOverlay', '装扮已保存'); };
+  $('#dressExit').onclick = ()=>{ const c = changed(); restoreOpts(optSnap); closeWith('#dressOverlay', c ? '已退出，未保存修改' : '已退出'); };
   $('#modesBtn').onclick = ()=>{ const i=MODES.findIndex(m=>m.id===S.mode); S.mode=MODES[(i+1)%MODES.length].id; applyMode(); openModeInfo(); };
   $('#modeClose').onclick = ()=>{ $('#modeOverlay').classList.remove('on'); if(S.screen==='game' && S.paused && S.modePaused) resume(); };
   const sfxRange2=$('#sfxRange2');
@@ -2313,9 +2465,9 @@ function bootFail(err){
 }
 
 async function boot(){
-  // 注入角色（含像素捏脸）
-  loadFace(); loadSeen();
-  renderCat();
+  // 注入角色
+  loadUp(); loadMy(); loadSeen();
+  renderCat(); applyUpCard();
   try{
     await loadAudio();
     $('#loadTxt').textContent = '准备就绪';
@@ -2338,6 +2490,7 @@ function proceed(){
   loadAch();
   applyTheme();
   renderCat();
+  applyMy(); applyUpCard(); syncOptsUI();
   $('#songTitleH1').innerHTML = ((SONG.title||'')).replace(' ', '<br/>') || '嘶恍而过的<br/>青葱岁月';
   $('#composerLbl').textContent = SONG.meta.composer || '—';
   $('#lyricistLbl').textContent = SONG.meta.lyricist || '—';
