@@ -1,0 +1,21 @@
+# 构建产物
+/index.html
+
+# 音轨与派生谱面（版权原因不入库，自行用 analyze.py 生成）
+/audio/
+/build/song.mp3
+/build/chart.json
+
+# 投稿物料
+/deliver/
+
+# 临时与自测产物
+/build/_chk/
+/build/_frames/
+/build/qa_shot.png
+/build/shot_*.png
+/build/cover.png
+/node_modules/
+*.log
+.DS_Store
+Thumbs.db

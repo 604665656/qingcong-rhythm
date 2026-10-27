@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<meta name="theme-color" content="#0b0a14" />
+<title>嘶恍而过的青葱岁月 · 音游</title>
+<style>
+  :root{
+    --ink-0:#07060d; --ink-1:#0c0a16; --ink-2:#151024; --ink-3:#221a33;
+    --peach:#ffb08a; --coral:#ff7a6b; --pink:#ff9ec7; --mint:#7ee8d0;
+    --amber:#ffd166; --violet:#a78bfa; --blue:#8ab6ff;
+    --txt:#f4eefb; --txt-dim:#a99dc0;
+    --lane0:66,232,208; --lane1:255,209,102; --lane2:255,158,199; --lane3:138,182,255;
+    --font: "PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;max-width:100vw;overflow:hidden;background:var(--ink-0);color:var(--txt);font-family:var(--font);}
+  body{position:fixed;inset:0;overscroll-behavior:none;touch-action:none;}
+  #app{position:absolute;inset:0;overflow:hidden;}
+
+  /* ---------------- 背景 ---------------- */
+  .bg{position:absolute;inset:0;pointer-events:none;}
+  .bg-sky{
+    background:
+      radial-gradient(120% 80% at 50% 108%, #ff9a76 0%, #ff7a8a 12%, rgba(150,80,140,.55) 34%, rgba(38,26,72,.15) 60%, transparent 72%),
+      radial-gradient(80% 60% at 50% 100%, rgba(255,209,102,.28), transparent 70%),
+      linear-gradient(180deg, #06050c 0%, #0d0a1a 28%, #1a1130 56%, #23143a 76%, #2c1633 100%);
+    opacity:1;transition:filter .6s ease;
+  }
+  .bg-rays{
+    background:
+      conic-gradient(from 200deg at 50% 112%, rgba(255,176,138,.16) 0deg, transparent 22deg, rgba(255,209,102,.10) 40deg, transparent 58deg, rgba(255,158,199,.13) 84deg, transparent 104deg);
+    mix-blend-mode:screen;opacity:.75;animation:rays 26s linear infinite;
+  }
+  @keyframes rays{0%{transform:rotate(0deg) scale(1.4);}100%{transform:rotate(360deg) scale(1.4);}}
+  .bg-grid{
+    background-image:linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+    background-size:64px 64px;
+    mask-image:linear-gradient(180deg,transparent 8%, rgba(0,0,0,.5) 46%, transparent 92%);
+    -webkit-mask-image:linear-gradient(180deg,transparent 8%, rgba(0,0,0,.5) 46%, transparent 92%);
+    opacity:.5;
+  }
+  .bg-vign{box-shadow:inset 0 0 min(28vh,220px) 40px rgba(4,3,10,.85);}
+  body.fever .bg-sky{filter:saturate(1.35) brightness(1.18) hue-rotate(-6deg);}
+  #fx{position:absolute;inset:0;pointer-events:none;}
+
+  /* ---------------- 通用 ---------------- */
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;visibility:hidden;transition:opacity .38s ease, visibility .38s;}
+  .screen.on{opacity:1;visibility:visible;}
+  .glass{background:linear-gradient(160deg, rgba(38,28,58,.72), rgba(16,12,28,.78));border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px);}
+  .btn{
+    position:relative;border:0;cursor:pointer;font-family:var(--font);font-weight:700;letter-spacing:.06em;color:#1a0f18;
+    background:linear-gradient(135deg,#ffd166,#ff9ec7 55%,#a78bfa);
+    padding:16px 40px;border-radius:999px;font-size:17px;
+    box-shadow:0 10px 30px rgba(255,140,170,.3), inset 0 1px 0 rgba(255,255,255,.6);
+    transition:transform .16s cubic-bezier(.2,.9,.3,1.4), box-shadow .2s, filter .2s;
+  }
+  .btn:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 16px 40px rgba(255,140,170,.45), inset 0 1px 0 rgba(255,255,255,.7);}
+  .btn:active{transform:translateY(1px) scale(.985);}
+  .btn.ghost{background:rgba(255,255,255,.06);color:var(--txt);border:1px solid rgba(255,255,255,.18);box-shadow:none;padding:12px 26px;font-size:14px;}
+  .btn.ghost:hover{background:rgba(255,255,255,.12);}
+  .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);font-size:11px;font-weight:700;color:#fff;}
+
+  /* ---------------- 标题页 ---------------- */
+  #titleScreen{padding:clamp(18px,4vh,48px) clamp(18px,5vw,72px);justify-content:center;}
+  .title-wrap{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(12px,3vw,40px);align-items:center;max-width:1180px;width:100%;margin:0 auto;}
+  @media (max-width:860px){ .title-wrap{grid-template-columns:1fr;} .title-art{display:none;} }
+  @media (max-width:820px){ .cat-arena{display:none;} }
+  @media (max-width:640px){
+    .hud-top{padding:8px 10px;gap:8px;}
+    .song-id{max-width:44vw;}
+    .song-id .t{font-size:11.5px;}
+    .song-id .s{font-size:9px;letter-spacing:.16em;}
+    .prog{width:42vw;}
+    .score{font-size:22px;}
+    .acc-line{font-size:9.5px;letter-spacing:.06em;}
+    #lyricBox{top:clamp(58px,11vh,96px);width:94vw;}
+    #lyricNow{font-size:15px;letter-spacing:.02em;}
+    #lyricNext{font-size:10.5px;}
+    #comboBox{top:30%;}
+    #judgeText{top:calc(100% - 22vh);}
+    .diffs{gap:8px;}
+    .diff{min-width:0;padding:11px 10px;border-radius:12px;}
+    .diff .dn{font-size:12.5px;letter-spacing:.06em;}
+    .diff .cnt{font-size:8.5px;right:8px;top:8px;}
+    .diff .ds{font-size:9.5px;letter-spacing:.1em;}
+    .diff .stars{font-size:9.5px;letter-spacing:1px;}
+    .title-actions{gap:10px;}
+    .btn{padding:14px 30px;font-size:15px;}
+    .btn.ghost{padding:11px 18px;font-size:12.5px;}
+    .res-grid{gap:6px;}
+    .res-cell .k{font-size:8px;letter-spacing:.08em;}
+    .res-cell .v{font-size:13px;}
+    .res-actions .btn{font-size:13px;padding:12px 0;}
+    .meta-row{font-size:11px;gap:6px 14px;}
+    #titleScreen{padding:20px 16px 40px;justify-content:flex-start;overflow-y:auto;}
+  }
+  .kicker{display:inline-flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.34em;color:var(--peach);text-transform:uppercase;margin-bottom:14px;opacity:.9;}
+  .kicker i{display:block;width:34px;height:1px;background:linear-gradient(90deg,var(--peach),transparent);}
+  h1{font-size:clamp(30px,5.4vw,62px);line-height:1.06;margin:0 0 6px;letter-spacing:.01em;
+     background:linear-gradient(120deg,#fff 8%, #ffe3c4 38%, #ffb0c8 62%, #c6b0ff 92%);
+     -webkit-background-clip:text;background-clip:text;color:transparent;
+     filter:drop-shadow(0 12px 34px rgba(255,140,170,.25));}
+  .sub{font-size:clamp(12px,1.5vw,15px);letter-spacing:.3em;color:var(--txt-dim);margin-bottom:22px;}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:12.5px;color:var(--txt-dim);margin-bottom:26px;}
+  .meta-row b{color:#e8dcf6;font-weight:600;}
+  .diffs{display:flex;gap:12px;margin-bottom:26px;flex-wrap:wrap;}
+  .diff{
+    flex:1 1 0;min-width:132px;cursor:pointer;padding:14px 16px;border-radius:16px;text-align:left;
+    background:linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.1);transition:.2s;position:relative;overflow:hidden;
+  }
+  .diff:hover{border-color:rgba(255,255,255,.28);transform:translateY(-2px);}
+  .diff.sel{background:linear-gradient(160deg, rgba(255,209,102,.22), rgba(255,158,199,.14));border-color:rgba(255,209,102,.65);box-shadow:0 12px 30px rgba(255,158,199,.18), inset 0 0 0 1px rgba(255,255,255,.14);}
+  .diff .dn{font-size:15px;font-weight:800;letter-spacing:.1em;padding-right:58px;}
+  .diff .ds{font-size:11px;color:var(--txt-dim);letter-spacing:.18em;margin-top:3px;}
+  .diff .stars{font-size:11px;letter-spacing:2px;color:var(--amber);margin-top:7px;height:14px;}
+  .diff .cnt{position:absolute;right:12px;top:14px;font-size:9.5px;color:var(--txt-dim);letter-spacing:.04em;white-space:nowrap;opacity:.85;}
+  .title-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .best{font-size:12px;color:var(--txt-dim);letter-spacing:.06em;}
+  .best b{color:var(--amber);font-variant-numeric:tabular-nums;font-size:14px;}
+  .title-art{position:relative;width:clamp(210px,26vw,330px);display:flex;justify-content:center;}
+  .title-art .halo{position:absolute;inset:-6% -10%;background:radial-gradient(50% 50% at 50% 46%, rgba(255,209,102,.30), rgba(255,158,199,.14) 44%, transparent 70%);filter:blur(6px);}
+  .cat{position:relative;width:100%;filter:drop-shadow(0 18px 34px rgba(0,0,0,.45));}
+  .cat.float{animation:float 5.2s ease-in-out infinite;}
+  @keyframes float{0%,100%{transform:translateY(0) rotate(-1.2deg);}50%{transform:translateY(-12px) rotate(1.2deg);}}
+  .title-foot{position:absolute;left:0;right:0;bottom:clamp(10px,2.4vh,22px);text-align:center;font-size:11px;color:rgba(200,190,220,.45);letter-spacing:.08em;
+    display:flex;flex-direction:column;gap:5px;padding:0 18px;}
+  .title-foot .health{font-size:10.5px;line-height:1.68;color:rgba(206,196,226,.52);letter-spacing:.05em;}
+  .title-foot .copy{font-size:10px;line-height:1.6;color:rgba(200,190,220,.34);letter-spacing:.04em;}
+  .br-m{display:none;}
+  .help-health{margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.09);
+    font-size:10px;line-height:1.8;color:rgba(200,190,220,.5);letter-spacing:.03em;}
+  .load-health{position:absolute;left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom,0px));
+    text-align:center;font-size:9.5px;line-height:1.75;letter-spacing:.04em;color:rgba(200,190,220,.34);padding:0 20px;}
+
+  /* ---------------- 游戏页 ---------------- */
+  #gameScreen{display:block;}
+  #playfield{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  #fx{width:100%;height:100%;display:block;}
+
+  .hud-top{position:absolute;top:0;left:0;right:0;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:clamp(10px,2vh,20px) clamp(14px,3vw,30px);pointer-events:none;}
+  .score-box{text-align:right;}
+  .score{font-size:clamp(22px,3.4vw,34px);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.02em;
+    background:linear-gradient(180deg,#fff,#ffd6b0);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 4px 16px rgba(255,180,140,.35));}
+  .acc-line{font-size:11.5px;color:var(--txt-dim);letter-spacing:.16em;font-variant-numeric:tabular-nums;margin-top:2px;}
+  .song-id{max-width:52vw;}
+  .song-id .t{font-size:13.5px;font-weight:700;letter-spacing:.04em;color:#efe6fb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .song-id .s{font-size:10.5px;color:var(--txt-dim);letter-spacing:.22em;margin-top:3px;}
+  .prog{height:3px;border-radius:3px;background:rgba(255,255,255,.12);margin-top:8px;overflow:hidden;width:min(38vw,300px);}
+  .prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--mint),var(--amber),var(--pink));transition:width .12s linear;}
+
+  #lyricBox{position:absolute;left:50%;top:clamp(64px,13vh,130px);transform:translateX(-50%);width:min(88vw,860px);text-align:center;pointer-events:none;}
+  #lyricNow{font-size:clamp(15px,2.5vw,25px);font-weight:700;letter-spacing:.06em;line-height:1.5;color:#fff;
+    text-shadow:0 0 24px rgba(255,180,140,.5),0 2px 18px rgba(0,0,0,.7);transition:opacity .25s;}
+  #lyricNext{font-size:clamp(11px,1.5vw,14px);color:rgba(220,208,240,.5);margin-top:8px;letter-spacing:.1em;height:20px;}
+
+  #comboBox{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;opacity:0;transition:opacity .18s;}
+  #comboBox.on{opacity:1;}
+  #comboNum{font-size:clamp(42px,8vw,78px);font-weight:900;font-style:italic;line-height:1;font-variant-numeric:tabular-nums;
+    background:linear-gradient(180deg,#fff,#ffd166 60%,#ff9ec7);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 6px 22px rgba(255,180,90,.45));}
+  #comboNum.pop{animation:pop .22s cubic-bezier(.2,1.6,.4,1);}
+  @keyframes pop{0%{transform:scale(1.28);}100%{transform:scale(1);}}
+  #comboLbl{font-size:11px;letter-spacing:.42em;color:rgba(255,225,200,.75);margin-top:2px;}
+
+  #judgeText{position:absolute;left:50%;top:calc(100% - 26vh);transform:translate(-50%,0);font-size:clamp(20px,3vw,28px);font-weight:900;letter-spacing:.14em;opacity:0;pointer-events:none;}
+  #judgeText.show{animation:jtext .5s ease-out forwards;}
+  @keyframes jtext{0%{opacity:0;transform:translate(-50%,8px) scale(.86);}18%{opacity:1;transform:translate(-50%,0) scale(1.06);}70%{opacity:1;transform:translate(-50%,-6px) scale(1);}100%{opacity:0;transform:translate(-50%,-16px) scale(.98);}}
+  .j-PERFECT{color:#ffe6a8;text-shadow:0 0 26px rgba(255,209,102,.9),0 0 60px rgba(255,158,199,.5);}
+  .j-GREAT{color:#9ff2dd;text-shadow:0 0 22px rgba(126,232,208,.8);}
+  .j-GOOD{color:#a9c6ff;text-shadow:0 0 18px rgba(138,182,255,.7);}
+  .j-MISS{color:#ff8b9a;text-shadow:0 0 18px rgba(255,110,140,.8);}
+
+  .cat-arena{position:absolute;right:clamp(8px,2vw,28px);bottom:clamp(10px,3vh,32px);width:clamp(110px,15vw,190px);pointer-events:none;transition:transform .1s;}
+  .cat-arena.hit{animation:catHit .28s cubic-bezier(.2,1.6,.4,1);}
+  @keyframes catHit{0%{transform:translateY(0) scale(1);}40%{transform:translateY(-10px) scale(1.07,.95);}100%{transform:translateY(0) scale(1);}}
+  .cat-arena.miss{animation:catMiss .34s ease-in-out;}
+  @keyframes catMiss{0%,100%{transform:translateX(0);}25%{transform:translateX(-7px) rotate(-3deg);}75%{transform:translateX(7px) rotate(3deg);}}
+  .cat-aura{position:absolute;inset:-18%;background:radial-gradient(50% 50% at 50% 55%, rgba(255,150,80,.42), rgba(255,90,60,.12) 48%, transparent 72%);opacity:0;transition:opacity .4s;}
+  body.fever .cat-aura{opacity:1;animation:aura 1.1s ease-in-out infinite alternate;}
+  @keyframes aura{from{transform:scale(.94);opacity:.68;}to{transform:scale(1.08);opacity:1;}}
+
+  .keys-hint{position:absolute;left:50%;bottom:clamp(6px,1.6vh,16px);transform:translateX(-50%);display:flex;gap:8px;font-size:10.5px;color:rgba(220,208,240,.42);letter-spacing:.16em;pointer-events:none;}
+  @media (max-width:760px){ .keys-hint{display:none;} }
+
+  #pauseBtn{position:absolute;left:12px;bottom:12px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:rgba(20,15,32,.45);color:rgba(255,255,255,.75);font-size:12px;cursor:pointer;backdrop-filter:blur(8px);z-index:5;}
+  #pauseBtn:hover{background:rgba(255,255,255,.16);color:#fff;}
+
+  /* ---------------- 遮罩/弹层 ---------------- */
+  .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,5,12,.72);backdrop-filter:blur(10px);z-index:20;}
+  .overlay.on{display:flex;}
+  .panel{width:min(92vw,420px);border-radius:24px;padding:26px 26px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6);}
+  .panel h3{margin:0 0 18px;font-size:17px;letter-spacing:.14em;font-weight:800;}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px;color:#ded3f0;}
+  .row:last-of-type{border-bottom:0;}
+  .row label{color:var(--txt-dim);letter-spacing:.06em;}
+  .row .val{font-variant-numeric:tabular-nums;color:#fff;font-weight:700;min-width:62px;text-align:right;}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:130px;height:3px;border-radius:3px;background:rgba(255,255,255,.2);outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,#ffd166,#ff9ec7);box-shadow:0 0 12px rgba(255,158,199,.7);cursor:pointer;}
+  .switch{position:relative;width:44px;height:24px;border-radius:99px;background:rgba(255,255,255,.16);cursor:pointer;transition:.2s;}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.22s;}
+  .switch.on{background:linear-gradient(135deg,var(--mint),var(--amber));}
+  .switch.on::after{left:23px;}
+  .panel-actions{display:flex;gap:10px;margin-top:20px;}
+  .panel-actions .btn{flex:1;padding:12px 0;font-size:14px;text-align:center;}
+
+  /* ---------------- 结算 ---------------- */
+  #resultScreen{align-items:center;justify-content:center;padding:20px;}
+  .res-card{width:min(94vw,560px);border-radius:26px;padding:clamp(20px,3.4vw,34px);box-shadow:0 30px 90px rgba(0,0,0,.65);position:relative;overflow:hidden;}
+  .res-card::before{content:"";position:absolute;inset:-40% -20% auto;height:60%;background:radial-gradient(50% 50% at 50% 50%, rgba(255,209,102,.28), transparent 70%);pointer-events:none;}
+  .res-top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:6px;}
+  .res-label{font-size:11px;letter-spacing:.36em;color:var(--peach);}
+  .rank{font-size:clamp(58px,11vw,92px);font-weight:900;font-style:italic;line-height:.9;letter-spacing:-.02em;
+    background:linear-gradient(160deg,#fff,#ffd166 46%,#ff9ec7 76%,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 10px 34px rgba(255,170,120,.45));animation:rankIn .7s cubic-bezier(.2,1.5,.4,1) both;}
+  @keyframes rankIn{0%{transform:scale(.3) rotate(-8deg);opacity:0;}100%{transform:scale(1) rotate(0);opacity:1;}}
+  .res-song{font-size:13px;color:var(--txt-dim);letter-spacing:.1em;margin-top:6px;}
+  .res-score{text-align:right;}
+  .res-score .n{font-size:clamp(26px,5vw,40px);font-weight:900;font-variant-numeric:tabular-nums;
+    background:linear-gradient(180deg,#fff,#ffd6b0);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .res-score .l{font-size:10.5px;letter-spacing:.3em;color:var(--txt-dim);}
+  .res-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:20px 0 4px;}
+  .res-cell{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px 6px;text-align:center;}
+  .res-cell .k{font-size:9.5px;letter-spacing:.14em;color:var(--txt-dim);display:block;margin-bottom:3px;}
+  .res-cell .v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .res-cell.p .v{color:#ffe6a8;} .res-cell.g .v{color:#9ff2dd;} .res-cell.o .v{color:#a9c6ff;} .res-cell.m .v{color:#ff8b9a;}
+  .res-bar{height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;margin:14px 0 18px;}
+  .res-bar i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--mint),var(--amber),var(--pink));transition:width 1s cubic-bezier(.2,.8,.2,1);}
+  .res-actions{display:flex;gap:10px;}
+  .res-actions .btn{flex:1;padding:13px 0;font-size:14px;text-align:center;}
+  .newrec{display:inline-block;font-size:10px;letter-spacing:.22em;padding:3px 9px;border-radius:99px;background:linear-gradient(135deg,#ffd166,#ff9ec7);color:#2a1220;font-weight:800;margin-left:8px;vertical-align:middle;animation:pop .4s;}
+
+  /* ---------------- Loading ---------------- */
+  #loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:50;background:var(--ink-0);transition:opacity .5s,visibility .5s;}
+  #loading.off{opacity:0;visibility:hidden;}
+  .load-ring{width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,255,255,.1);border-top-color:var(--peach);animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .load-txt{font-size:11.5px;letter-spacing:.32em;color:var(--txt-dim);}
+  .load-err{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:min(88vw,420px);text-align:center;}
+  .load-err .le-msg{font-size:13px;color:#ffcdd6;letter-spacing:.02em;line-height:1.5;}
+  .load-err .le-tip{font-size:11px;color:var(--txt-dim);line-height:1.75;}
+  .load-err .le-acts{display:flex;gap:10px;margin-top:6px;}
+  .load-err .le-acts .btn{font-size:12.5px;padding:11px 22px;}
+
+  /* 手柄状态角标 */
+  #padBadge{position:fixed;left:12px;bottom:12px;z-index:60;display:none;
+    padding:6px 11px;border-radius:10px;font-size:10.5px;letter-spacing:.06em;
+    color:#cfe4ff;background:rgba(18,26,48,.78);border:1px solid rgba(138,182,255,.42);
+    backdrop-filter:blur(6px);pointer-events:none;max-width:44vw;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;}
+  #padBadge.on{display:block;}
+  body.gaming #padBadge{display:none;}
+
+  .hitflash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(50% 40% at 50% 100%, rgba(255,209,102,.22), transparent 70%);opacity:0;transition:opacity .12s;}
+  body.perfect .hitflash{opacity:1;}
+
+  /* ---------- 响应式覆盖（置于最后，确保优先级） ---------- */
+  @media (max-width:860px){
+    .title-wrap{grid-template-columns:1fr;}
+    .title-art{display:none !important;}
+  }
+  @media (max-width:820px){ .cat-arena{display:none !important;} }
+  @media (max-width:640px){
+    #titleScreen{justify-content:center;padding:16px 16px 12px;overflow-y:auto;}
+    .kicker{font-size:10px;letter-spacing:.26em;margin-bottom:10px;}
+    h1{font-size:clamp(26px,7.4vw,38px);}
+    .sub{font-size:11px;letter-spacing:.22em;margin-bottom:14px;}
+    .meta-row{font-size:10.5px;gap:4px 12px;margin-bottom:16px;}
+    .diffs{gap:7px;margin-bottom:18px;}
+    .diff{padding:10px 9px;border-radius:12px;}
+    .diff .dn{font-size:12px;letter-spacing:.04em;padding-right:0;}
+    .diff .ds{font-size:9px;letter-spacing:.08em;}
+    .diff .stars{font-size:9px;letter-spacing:.5px;}
+    .diff .cnt{position:static;display:block;font-size:8.5px;margin-top:5px;opacity:.7;}
+    .title-actions{gap:8px;}
+    .best{width:100%;font-size:10.5px;margin-top:2px;}
+    .btn{padding:13px 24px;font-size:14px;}
+    .btn.ghost{padding:10px 16px;font-size:12px;}
+    .title-foot{position:static;margin-top:16px;font-size:9.5px;line-height:1.7;letter-spacing:.04em;}
+    .hud-top{padding:8px 10px;gap:6px;}
+    .song-id{max-width:46vw;}
+    .song-id .t{font-size:11px;}
+    .song-id .s{font-size:8.5px;letter-spacing:.14em;}
+    .prog{width:44vw;margin-top:6px;}
+    .score{font-size:20px;}
+    .acc-line{font-size:9px;letter-spacing:.04em;}
+    #lyricBox{top:clamp(54px,10vh,90px);width:94vw;}
+    #lyricNow{font-size:14.5px;letter-spacing:.01em;}
+    #lyricNext{font-size:10px;}
+    #comboBox{top:29%;}
+    #comboNum{font-size:46px;}
+    #judgeText{top:calc(100% - 21vh);font-size:18px;}
+    #pauseBtn{left:auto;right:10px;bottom:10px;width:28px;height:28px;font-size:10px;}
+    .res-card{width:94vw;padding:18px;}
+    .res-grid{grid-template-columns:repeat(4,1fr);gap:5px;}
+    .res-cell{padding:7px 4px;}
+    .res-cell .k{font-size:7.5px;letter-spacing:.04em;}
+    .res-cell .v{font-size:12.5px;}
+    .res-actions .btn{font-size:12.5px;padding:11px 0;}
+  }
+  /* ---------- 横屏手机（高度受限，竖屏转过来） ---------- */
+  @media (max-height:540px) and (orientation:landscape){
+    #titleScreen{padding:8px 22px;justify-content:center;align-items:center;}
+    .title-wrap{grid-template-columns:1.2fr .8fr;gap:16px;align-items:center;}
+    .title-art{display:block !important;}
+    h1{font-size:clamp(19px,5.2vh,30px);line-height:1.12;margin-bottom:5px;}
+    .kicker{font-size:9px;margin-bottom:5px;letter-spacing:.2em;}
+    .sub{font-size:9px;letter-spacing:.16em;margin-bottom:6px;}
+    .meta-row{font-size:9px;gap:2px 10px;margin-bottom:7px;}
+    .diffs{gap:6px;margin-bottom:9px;}
+    .diff{padding:6px 9px;border-radius:10px;}
+    .diff .dn{font-size:11px;letter-spacing:.03em;padding-right:0;}
+    .diff .ds{display:none;}
+    .diff .stars{font-size:8px;letter-spacing:.3px;}
+    .diff .cnt{position:static;display:block;font-size:8px;margin-top:3px;opacity:.72;}
+    .title-actions{gap:7px;}
+    .btn{padding:9px 18px;font-size:12.5px;}
+    .btn.ghost{padding:7px 12px;font-size:11px;}
+    .best{font-size:9.5px;}
+    .title-foot{display:none;}
+    .who-wrap{margin-top:6px;}
+    .who{font-size:9px;}
+    /* 游戏内 */
+    .hud-top{padding:5px 10px;gap:6px;}
+    .song-id .t{font-size:10.5px;}
+    .song-id .s{font-size:8px;}
+    .prog{width:34vw;margin-top:4px;}
+    .score{font-size:17px;}
+    .acc-line{font-size:8.5px;}
+    #lyricBox{top:4px;width:min(88vw,520px);}
+    #lyricNow{font-size:12px;}
+    #lyricNext{display:none;}
+    #comboBox{top:21%;}
+    #comboNum{font-size:34px;}
+    #catArena{display:none !important;}
+    #judgeText{top:calc(100% - 18vh);font-size:15px;}
+    #pauseBtn{width:26px;height:26px;font-size:9px;}
+    .res-card{padding:12px 16px;width:min(92vw,540px);}
+    .res-title{font-size:11px;}
+    .res-grid{gap:5px;margin-top:8px;}
+    .res-cell{padding:6px 4px;}
+    .res-cell .k{font-size:7px;}
+    .res-cell .v{font-size:12px;}
+    .res-actions .btn{padding:9px 0;font-size:11.5px;}
+    /* 弹层 */
+    .sheet{max-height:94vh;padding:14px 16px 12px;}
+    .sheet-title{font-size:13px;}
+    .sheet-title small{font-size:8.5px;margin-top:2px;}
+  }
+  /* ---------- 竖屏：落音区收窄、判定线抬高，避免手指遮挡 ---------- */
+  @media (orientation:portrait){
+    #comboBox{top:26%;}
+    #lyricBox{width:min(94vw,520px);}
+  }
+__PLATFORM_CSS__
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="bg bg-sky"></div>
+  <div class="bg bg-rays"></div>
+  <div class="bg bg-grid"></div>
+  <canvas id="fx"></canvas>
+  <div class="bg bg-vign"></div>
+  <div class="hitflash"></div>
+
+  <!-- ================= 标题页 ================= -->
+  <section class="screen on" id="titleScreen">
+    <div class="title-wrap">
+      <div>
+        <div class="kicker"><i></i>Rhythm · 青葱岁月</div>
+        <h1>嘶恍而过的<br/>青葱岁月</h1>
+        <div class="sub">哈士猫 · 音乐节奏游戏</div>
+        <div class="meta-row">
+          <span>作曲 <b>__COMPOSER__</b></span>
+          <span>作词 <b>__LYRICIST__</b></span>
+          <span>BPM <b id="bpmLbl">--</b></span>
+          <span>时长 <b id="durLbl">--:--</b></span>
+        </div>
+        <div class="diffs" id="diffs"></div>
+        <div class="title-actions">
+          <button class="btn" id="startBtn">开始游戏</button>
+          <button class="btn ghost" id="settingBtn">设置</button>
+          <button class="btn ghost" id="helpBtn">玩法</button>
+          <div class="best">最佳 <b id="bestLbl">—</b></div>
+        </div>
+      </div>
+      <div class="title-art">
+        <div class="halo"></div>
+        <div class="cat-art" id="catTitle"></div>
+      </div>
+    </div>
+    <div class="title-foot">
+      <div class="health">抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。<br class="br-m"/>适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。</div>
+      <div class="copy">角色形象经作者授权，本作美术为全新原创绘制，未使用任何原始图片素材 · 音乐版权归原作者所有</div>
+    </div>
+  </section>
+
+  <!-- ================= 游戏页 ================= -->
+  <section class="screen" id="gameScreen">
+    <canvas id="playfield"></canvas>
+    <div class="hud-top">
+      <div class="song-id">
+        <div class="t">嘶恍而过的青葱岁月</div>
+        <div class="s" id="diffTag">NORMAL</div>
+        <div class="prog"><i id="progBar"></i></div>
+      </div>
+      <div class="score-box">
+        <div class="score" id="scoreLbl">0</div>
+        <div class="acc-line"><span id="accLbl">100.00%</span> · <span id="comboMini">0 COMBO</span></div>
+      </div>
+    </div>
+    <button id="pauseBtn" title="暂停 (Esc)">❚❚</button>
+    <div id="lyricBox">
+      <div id="lyricNow"></div>
+      <div id="lyricNext"></div>
+    </div>
+    <div id="comboBox"><div id="comboNum">0</div><div id="comboLbl">COMBO</div></div>
+    <div id="judgeText"></div>
+    <div class="cat-arena" id="catArena"><div class="cat-aura"></div><div class="cat-art" id="catGame"></div></div>
+    <div class="keys-hint"><span>D</span><span>F</span><span>J</span><span>K · 长按可延音</span></div>
+  </section>
+
+  <!-- ================= 结算 ================= -->
+  <section class="screen" id="resultScreen">
+    <div class="res-card glass">
+      <div class="res-top">
+        <div>
+          <div class="res-label">RESULT · <span id="resDiff">NORMAL</span></div>
+          <div class="rank" id="resRank">S</div>
+          <div class="res-song" id="resSong">嘶恍而过的青葱岁月</div>
+        </div>
+        <div class="res-score">
+          <div class="n" id="resScore">0</div>
+          <div class="l">SCORE</div>
+        </div>
+      </div>
+      <div class="res-grid">
+        <div class="res-cell p"><span class="k">PERFECT</span><span class="v" id="resP">0</span></div>
+        <div class="res-cell g"><span class="k">GREAT</span><span class="v" id="resG">0</span></div>
+        <div class="res-cell o"><span class="k">GOOD</span><span class="v" id="resO">0</span></div>
+        <div class="res-cell m"><span class="k">MISS</span><span class="v" id="resM">0</span></div>
+      </div>
+      <div class="res-grid" style="grid-template-columns:repeat(3,1fr);margin-top:8px;">
+        <div class="res-cell"><span class="k">ACCURACY</span><span class="v" id="resAcc">0%</span></div>
+        <div class="res-cell"><span class="k">MAX COMBO</span><span class="v" id="resCombo">0</span></div>
+        <div class="res-cell"><span class="k">NOTES</span><span class="v" id="resNotes">0</span></div>
+      </div>
+      <div class="res-bar"><i id="resAccBar"></i></div>
+      <div class="res-actions">
+        <button class="btn" id="retryBtn">再来一次</button>
+        <button class="btn ghost" id="backBtn" style="flex:.62">返回选曲</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 弹层 ================= -->
+  <div class="overlay" id="pauseOverlay">
+    <div class="panel glass">
+      <h3>暂停</h3>
+      <div class="row"><label>判定偏移</label><span class="val" id="offVal2">0 ms</span></div>
+      <div class="row"><label><input type="range" id="offRange2" min="-200" max="200" step="5" value="0" /></label><span style="font-size:10.5px;color:var(--txt-dim)">晚按调正 · 早按调负</span></div>
+      <div class="panel-actions">
+        <button class="btn ghost" id="resumeBtn">继续</button>
+        <button class="btn ghost" id="quitBtn">退出</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="settingOverlay">
+    <div class="panel glass">
+      <h3>设置</h3>
+      <div class="row"><label>判定偏移</label><span class="val" id="offVal">0 ms</span></div>
+      <div class="row"><label><input type="range" id="offRange" min="-200" max="200" step="5" value="0" /></label><span style="font-size:10.5px;color:var(--txt-dim)">音画不同步时微调</span></div>
+      <div class="row"><label>音符速度</label><span class="val" id="spdVal">1.0×</span></div>
+      <div class="row"><label><input type="range" id="spdRange" min="0.6" max="1.8" step="0.05" value="1" /></label><span style="font-size:10.5px;color:var(--txt-dim)">越大越快</span></div>
+      <div class="row"><label>音量</label><span class="val" id="volVal">80%</span></div>
+      <div class="row"><label><input type="range" id="volRange" min="0" max="100" step="1" value="80" /></label><span style="font-size:10.5px;color:var(--txt-dim)">音乐</span></div>
+      <div class="row"><label>自动演示</label><div class="switch" id="autoSw"></div></div>
+      <div class="panel-actions"><button class="btn ghost" id="settingClose" style="flex:1">完成</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="helpOverlay">
+    <div class="panel glass">
+      <h3>玩法</h3>
+      <div class="row"><label>键盘</label><span><span class="kbd">D</span> <span class="kbd">F</span> <span class="kbd">J</span> <span class="kbd">K</span></span></div>
+      <div class="row"><label>手机 / 触屏</label><span>点按轨道下方，按住横向滑可连打</span></div>
+      <div class="row"><label>手柄</label><span>A B X Y / 十字键，Start 暂停</span></div>
+      <div class="row"><label>长条音符</label><span>按住直到条尾</span></div>
+      <div class="row"><label>判定</label><span>PERFECT ±45ms</span></div>
+      <div class="row"><label>FEVER</label><span>50 连击进入 ×1.5 加成</span></div>
+      <div class="row"><label>暂停</label><span><span class="kbd">Esc</span> / 右下角按钮</span></div>
+      <div class="help-health">抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。<br/>适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。</div>
+      <div class="panel-actions"><button class="btn ghost" id="helpClose" style="flex:1">知道了</button></div>
+    </div>
+  </div>
+
+  <div id="loading">
+    <div class="load-ring"></div>
+    <div class="load-txt" id="loadTxt">正在载入音轨</div>
+    <div class="load-health">抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。<br/>适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。</div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   嘶恍而过的青葱岁月 · Web 音游
+   原创实现：谱面由音频起始点分析离线生成
+   ============================================================ */
+const SONG = __SONG_DATA__;
+const AUDIO_DATA_URI = "__AUDIO__";
+
+/* 移动端没有控制台，把运行错误直接印到加载页，避免"卡住但没提示" */
+window.addEventListener('error', function(e){
+  if(window.__loaded) return;
+  const t = document.getElementById('loadTxt');
+  if(t) t.textContent = '出错了：' + ((e && e.message) || '未知错误');
+});
+window.addEventListener('unhandledrejection', function(e){
+  if(window.__loaded) return;
+  const r = e && e.reason;
+  const t = document.getElementById('loadTxt');
+  if(t) t.textContent = '出错了：' + ((r && r.message) || r || '未处理的 Promise 异常');
+});
+
+/* ---------- 角色（原创绘制，非原图） ---------- */
+const CAT_SVG = `
+<svg class="cat" viewBox="0 0 220 250" xmlns="http://www.w3.org/2000/svg" aria-label="哈士猫形象">
+  <defs>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/><stop offset="65%" stop-color="#f4f1fa"/><stop offset="100%" stop-color="#dfd8ef"/>
+    </linearGradient>
+    <linearGradient id="furGray" x1="0.1" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#c2bfd2"/><stop offset="50%" stop-color="#9d9ab2"/><stop offset="100%" stop-color="#7c7991"/>
+    </linearGradient>
+    <linearGradient id="furGraySoft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b4b1c6" stop-opacity=".95"/><stop offset="100%" stop-color="#8b88a2" stop-opacity=".85"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="36%" cy="30%" r="74%">
+      <stop offset="0%" stop-color="#cdeeff"/><stop offset="40%" stop-color="#6fc1f7"/><stop offset="78%" stop-color="#2a76c4"/><stop offset="100%" stop-color="#123f75"/>
+    </radialGradient>
+    <linearGradient id="lens" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,.6)"/><stop offset="48%" stop-color="rgba(255,255,255,.05)"/><stop offset="100%" stop-color="rgba(255,255,255,.28)"/>
+    </linearGradient>
+    <linearGradient id="nose" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffa7ba"/><stop offset="100%" stop-color="#e7748f"/>
+    </linearGradient>
+    <linearGradient id="scarf" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff8f6b"/><stop offset="100%" stop-color="#e2534f"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3.4"/></filter>
+  </defs>
+
+  <!-- 尾巴 -->
+  <path d="M164 206c24 8 40 -6 38 -26 -2 -16 -15 -24 -27 -19" fill="none" stroke="url(#furGray)" stroke-width="15" stroke-linecap="round"/>
+  <path d="M196 158c6 2 9 7 9 12" fill="none" stroke="#e9e4f5" stroke-width="9" stroke-linecap="round"/>
+
+  <!-- 身体 -->
+  <path d="M110 152c-32 0-56 20-60 46 -3 22 12 38 34 40h52c22-2 37-18 34-40 -4-26-28-46-60-46z" fill="url(#fur)"/>
+  <!-- 身体灰斑（右侧） -->
+  <path d="M148 168c16 10 24 26 25 42 1 12-5 22-15 26 8-24 2-50-10-68z" fill="url(#furGraySoft)"/>
+  <path d="M70 172c-10 10-16 24-16 38 0 10 4 18 12 24 -8-22-5-44 4-62z" fill="url(#furGraySoft)" opacity=".55"/>
+  <!-- 胸前绒毛 -->
+  <path d="M110 168c-9 0-17 3-24 8 5 4 7 9 8 14 -8 3-14 9-16 17 10-7 19-7 27-1 2-6 3-11 5-15 2 4 3 9 5 15 8-6 17-6 27 1 -2-8-8-14-16-17 1-5 3-10 8-14 -7-5-15-8-24-8z" fill="#fffafd"/>
+  <!-- 前爪 -->
+  <ellipse cx="84" cy="234" rx="19" ry="12" fill="#fffafd"/>
+  <ellipse cx="136" cy="234" rx="19" ry="12" fill="#fffafd"/>
+  <path d="M76 234h14M130 234h14" stroke="#e6dff2" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- 围巾 -->
+  <path d="M78 156c9 9 20 14 32 14s23-5 32-14c4 6 6 13 6 19 -11 9-24 14-38 14s-27-5-38-14c0-6 2-13 6-19z" fill="url(#scarf)"/>
+  <path d="M110 186c-4 6-6 14-6 22 0 7 2 12 6 16 4-4 6-9 6-16 0-8-2-16-6-22z" fill="#ef6157"/>
+  <circle cx="110" cy="188" r="6.4" fill="#ffd166" stroke="#e2534f" stroke-width="1.6"/>
+
+  <!-- 耳朵 -->
+  <path d="M58 96C47 68 40 44 42 25c1-10 10-11 18-4 15 13 27 30 33 47z" fill="url(#furGray)"/>
+  <path d="M162 96c11-28 18-52 16-71-1-10-10-11-18-4-15 13-27 30-33 47z" fill="url(#furGray)"/>
+  <path d="M61 88c-7-20-11-35-11-47 0-4 2-5 6-2 9 8 17 19 22 31z" fill="#ffc7d1"/>
+  <path d="M159 88c7-20 11-35 11-47 0-4-2-5-6-2-9 8-17 19-22 31z" fill="#ffc7d1"/>
+  <path d="M50 40c4-6 9-8 14-8M170 40c-4-6-9-8-14-8" stroke="#eee9f8" stroke-width="2" stroke-linecap="round" opacity=".8"/>
+
+  <!-- 头 -->
+  <path d="M110 46c35 0 59 25 59 57 0 35-26 58-59 58s-59-23-59-58c0-32 24-57 59-57z" fill="url(#fur)"/>
+  <!-- 哈士奇面具 -->
+  <path d="M110 46c35 0 59 25 59 57 0 7-1 13-3 19-10-6-15-17-21-27-7-12-17-17-25-27-6-8-8-15-10-22z" fill="url(#furGray)" opacity=".95"/>
+  <path d="M110 46c-13 0-25 4-35 11 6 7 12 9 18 13 7 5 10 11 17 11 7 0 11-6 17-11 6-4 12-6 18-13-10-7-22-11-35-11z" fill="url(#furGray)" opacity=".95"/>
+  <path d="M105 48c2-13 8-19 17-21-5 7-7 13-7 19z" fill="#aaa7bc"/>
+
+  <!-- 眼睛 -->
+  <g class="eyes">
+    <ellipse cx="84" cy="107" rx="19" ry="21" fill="#fff"/>
+    <ellipse cx="136" cy="107" rx="19" ry="21" fill="#fff"/>
+    <circle cx="85" cy="108" r="14" fill="url(#iris)"/>
+    <circle cx="135" cy="108" r="14" fill="url(#iris)"/>
+    <circle cx="85" cy="109" r="6.2" fill="#101d33"/>
+    <circle cx="135" cy="109" r="6.2" fill="#101d33"/>
+    <circle cx="80" cy="102" r="4.8" fill="#fff" opacity=".96"/>
+    <circle cx="130" cy="102" r="4.8" fill="#fff" opacity=".96"/>
+    <circle cx="89.5" cy="115" r="2.2" fill="#fff" opacity=".55"/>
+    <circle cx="139.5" cy="115" r="2.2" fill="#fff" opacity=".55"/>
+  </g>
+  <ellipse cx="64" cy="127" rx="10" ry="6" fill="#ff9fb4" opacity=".42" filter="url(#soft)"/>
+  <ellipse cx="156" cy="127" rx="10" ry="6" fill="#ff9fb4" opacity=".42" filter="url(#soft)"/>
+
+  <!-- 鼻嘴 -->
+  <path d="M110 124c3.5 0 6.2 2.7 6.2 5.5 0 3-2.9 5.4-6.2 5.4s-6.2-2.4-6.2-5.4c0-2.8 2.7-5.5 6.2-5.5z" fill="url(#nose)"/>
+  <path d="M110 135v3.6" stroke="#c98a9b" stroke-width="1.8" stroke-linecap="round"/>
+  <g class="mouth">
+    <path d="M110 138.6c-2 6-9.4 8-13.4 3M110 138.6c2 6 9.4 8 13.4 3" fill="none" stroke="#c98a9b" stroke-width="2.3" stroke-linecap="round"/>
+    <path d="M102 143c2 5 5.6 7 8 7s6-2 8-7z" fill="#e8738f" opacity=".92"/>
+  </g>
+  <path d="M56 119h17M56 129h19M147 119h17M145 129h19" stroke="#d3cce2" stroke-width="1.7" stroke-linecap="round" opacity=".9"/>
+
+  <!-- 眼镜 -->
+  <g class="glasses">
+    <circle cx="84" cy="107" r="25.5" fill="url(#lens)" opacity=".5"/>
+    <circle cx="136" cy="107" r="25.5" fill="url(#lens)" opacity=".5"/>
+    <circle cx="84" cy="107" r="25.5" fill="none" stroke="#2b2733" stroke-width="5.6"/>
+    <circle cx="136" cy="107" r="25.5" fill="none" stroke="#2b2733" stroke-width="5.6"/>
+    <path d="M109 105c-2.6-3.2-4.4-3.2-6.4 0M109 105c2.6-3.2 4.4-3.2 6.4 0" fill="none" stroke="#2b2733" stroke-width="5" stroke-linecap="round"/>
+    <path d="M58 100c-6-2-11 0-13 4M162 100c6-2 11 0 13 4" fill="none" stroke="#2b2733" stroke-width="4.6" stroke-linecap="round"/>
+    <path d="M66 93c6-6 14-8 22-7" stroke="rgba(255,255,255,.78)" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+    <path d="M118 93c6-6 14-8 22-7" stroke="rgba(255,255,255,.5)" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>`;
+
+/* ---------- 常量 ---------- */
+const LANES = 4;
+const KEYMAP = {KeyD:0, KeyF:1, KeyJ:2, KeyK:3, ArrowLeft:0, ArrowDown:1, ArrowUp:2, ArrowRight:3};
+const LANE_COLORS = ['#42e8d0','#ffd166','#ff9ec7','#8ab6ff'];
+const LANE_KEYS = ['D','F','J','K'];
+const WIN = {PERFECT:0.045, GREAT:0.090, GOOD:0.135, MISS:0.180};
+const SCORE_VAL = {PERFECT:1000, GREAT:700, GOOD:350, MISS:0};
+const ACC_VAL = {PERFECT:1, GREAT:0.75, GOOD:0.4, MISS:0};
+const DIFFS = [
+  {id:'easy',   name:'EASY',   cn:'轻松', stars:'★★☆☆', color:'#7ee8d0'},
+  {id:'normal', name:'NORMAL', cn:'心动', stars:'★★★☆', color:'#ffd166'},
+  {id:'hard',   name:'HARD',   cn:'青春', stars:'★★★★★', color:'#ff9ec7'}
+];
+
+/* ---------- 状态 ---------- */
+const S = {
+  diff: 'normal', screen:'title', playing:false, paused:false, auto:false,
+  offset: 0, speed: 1, vol: 0.8,
+  chart: [], notes: [], beats: [], lyrics: [],
+  judge: {PERFECT:0, GREAT:0, GOOD:0, MISS:0}, combo:0, maxCombo:0, score:0, accSum:0, accCount:0,
+  fever:false, t:0, startT:0, dur: SONG.meta.duration
+};
+const store = {
+  get k(){ return 'qc_rhythm_v1_' + S.diff; },
+  best(){ try{ return parseFloat(localStorage.getItem(this.k)||'0')||0; }catch(e){ return 0; } },
+  set(v){ try{ if(v>this.best()) localStorage.setItem(this.k, String(v)); }catch(e){} }
+};
+
+/* ---------- DOM ---------- */
+const $ = s => document.querySelector(s);
+const titleScreen=$('#titleScreen'), gameScreen=$('#gameScreen'), resultScreen=$('#resultScreen');
+const pf = $('#playfield'), pctx = pf.getContext('2d');
+const fx = $('#fx'), fctx = fx.getContext('2d');
+
+/* ---------- 音频 ---------- */
+let actx=null, abuf=null, srcNode=null, gainNode=null, startAt=0, pausedAt=0;
+let audioEl=null, audioMode='webaudio';
+function b64ToBuf(uri){
+  const b64 = uri.slice(uri.indexOf(',')+1);
+  const bin = atob(b64), len = bin.length, u8 = new Uint8Array(len);
+  for(let i=0;i<len;i++) u8[i] = bin.charCodeAt(i);
+  return u8.buffer;
+}
+/* 旧版 Safari 的 decodeAudioData 只支持回调形式（返回值是 undefined），
+   新版同时返回 Promise。这里两种都接住，谁先回来用谁。 */
+function decodeAny(ctx, raw, ms){
+  return new Promise((res, rej)=>{
+    let done = false;
+    const ok = b=>{ if(done) return; done = true; clearTimeout(timer); res(b); };
+    const bad = e=>{ if(done) return; done = true; clearTimeout(timer); rej(e || new Error('解码失败')); };
+    const timer = setTimeout(()=>bad(new Error('解码超时')), ms || 20000);
+    let ret;
+    try{
+      ret = ctx.decodeAudioData(raw, b=>ok(b), e=>bad(e));
+    }catch(err){ return bad(err); }
+    if(ret && typeof ret.then === 'function') ret.then(ok, bad);
+  });
+}
+function blobUrlFor(u8){
+  try{
+    return URL.createObjectURL(new Blob([u8], {type:'audio/mpeg'}));
+  }catch(e){
+    return AUDIO_DATA_URI;   // 极端情况下退回 data URI
+  }
+}
+const nowSec = () => performance.now()/1000;
+function setVolume(v){
+  S.vol = v;
+  if(audioMode==='webaudio' && gainNode) gainNode.gain.value = v;
+  else if(audioEl) audioEl.volume = v;
+}
+async function loadAudio(){
+  const say = t => { const n = $('#loadTxt'); if(n) n.textContent = t; };
+  let u8 = null;
+  try{ u8 = new Uint8Array(b64ToBuf(AUDIO_DATA_URI)); }catch(e){ u8 = null; }
+
+  /* ---------- 路径 1：WebAudio 精确时钟 ---------- */
+  try{
+    say('正在解码音轨…');
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) throw new Error('浏览器不支持 AudioContext');
+    actx = new AC({latencyHint:'interactive'});
+    gainNode = actx.createGain(); gainNode.gain.value = S.vol; gainNode.connect(actx.destination);
+    const raw = u8 ? u8.buffer.slice(0) : b64ToBuf(AUDIO_DATA_URI);
+    const buf = await decodeAny(actx, raw, 20000);
+    if(!buf || !buf.duration || !isFinite(buf.duration)) throw new Error('解码结果无效');
+    abuf = buf; audioMode = 'webaudio'; S.dur = buf.duration;
+    return;
+  }catch(err){
+    console.warn('[audio] WebAudio 路径不可用：', (err && (err.message||err)) || err);
+    try{ if(actx && actx.close) actx.close(); }catch(e){}
+    actx = null; gainNode = null; abuf = null;
+  }
+
+  /* ---------- 路径 2：<audio> 元素 + Blob URL（iOS 上远比 data: URI 稳） ---------- */
+  say('切换到播放器模式…');
+  audioMode = 'element'; S.dur = SONG.meta.duration;
+  try{
+    audioEl = document.createElement('audio');
+    audioEl.setAttribute('playsinline','');
+    audioEl.setAttribute('webkit-playsinline','');
+    audioEl.preload = 'auto'; audioEl.volume = S.vol;
+    audioEl.src = blobUrlFor(u8);
+    audioEl.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(audioEl);
+    audioEl.load();
+    await new Promise(res=>{
+      let done = false;
+      const onMeta = ()=>{
+        if(audioEl.duration && isFinite(audioEl.duration)) S.dur = audioEl.duration;
+        fin();
+      };
+      const fin = ()=>{ if(done) return; done = true; clearTimeout(timer); res(); };
+      const timer = setTimeout(fin, 12000);
+      audioEl.addEventListener('loadedmetadata', onMeta);
+      audioEl.addEventListener('canplay', fin);
+      audioEl.addEventListener('error', fin);
+    });
+    if(audioEl.duration && isFinite(audioEl.duration)) S.dur = audioEl.duration;
+    if(!audioEl.duration || !isFinite(audioEl.duration)) throw new Error('播放器未能读取音轨');
+  }catch(err){
+    console.warn('[audio] 播放器路径不可用：', (err && (err.message||err)) || err);
+    try{ if(audioEl){ audioEl.pause(); audioEl.src=''; } }catch(e){}
+    audioEl = null;
+    throw err;
+  }
+}
+function songTime(){
+  if(audioMode==='element') return (audioEl? audioEl.currentTime : 0) - S.offset/1000;
+  if(audioMode==='clock') return (S.playing ? nowSec() - startAt : pausedAt) - S.offset/1000;
+  if(!actx) return 0;
+  if(!S.playing) return pausedAt;
+  return (actx.currentTime - startAt) - S.offset/1000;
+}
+function startAudio(from){
+  from = Math.max(0, from);
+  if(audioMode==='element'){
+    audioEl.currentTime = from;
+    const p = audioEl.play();
+    if(p && p.catch) p.catch(()=>{});
+    S.playing = true; S.paused = false; pausedAt = from;
+    return;
+  }
+  if(audioMode==='clock'){
+    startAt = nowSec() - from;
+    S.playing = true; S.paused = false; pausedAt = from;
+    return;
+  }
+  if(srcNode){ try{ srcNode.stop(); }catch(e){} srcNode.disconnect(); }
+  srcNode = actx.createBufferSource(); srcNode.buffer = abuf; srcNode.connect(gainNode);
+  const t0 = actx.currentTime + 0.12;
+  srcNode.start(t0, from);
+  startAt = t0 - from;
+  S.playing = true; S.paused = false;
+}
+function stopAudio(){
+  if(audioMode==='element'){ try{ audioEl.pause(); }catch(e){} S.playing=false; return; }
+  if(audioMode==='clock'){ pausedAt = nowSec() - startAt; S.playing = false; return; }
+  if(srcNode){ try{ srcNode.stop(); }catch(e){} srcNode.disconnect(); srcNode=null; }
+  S.playing = false;
+}
+/* iOS 需要一次真实手势才允许出声：用 1 帧静音把 AudioContext 解锁 */
+function unlockAudio(){
+  try{
+    if(actx && actx.state === 'suspended') actx.resume();
+    if(actx && !actx.__unlocked){
+      const b = actx.createBuffer(1, 1, 22050);
+      const s = actx.createBufferSource(); s.buffer = b; s.connect(actx.destination); s.start(0);
+      actx.__unlocked = true;
+    }
+    if(audioEl && audioEl.paused){
+      const p = audioEl.play();
+      if(p && p.catch) p.catch(()=>{});
+    }
+  }catch(e){}
+}
+
+/* ---------- 画布尺寸 ---------- */
+const V = {w:0,h:0,dpr:1,laneX:0,laneW:0,judgeY:0,topY:0,portrait:false};
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio||1, 2.5);
+  const w = pf.clientWidth || innerWidth, h = pf.clientHeight || innerHeight;
+  if(!w || !h) return;
+  V.dpr = dpr; V.w = w; V.h = h;
+  V.portrait = h > w;
+  document.body.classList.toggle('portrait', V.portrait);
+  document.body.classList.toggle('landscape', !V.portrait);
+  [pf,fx].forEach(c=>{ c.width = Math.round(w*dpr); c.height = Math.round(h*dpr); });
+  pctx.setTransform(dpr,0,0,dpr,0,0); fctx.setTransform(dpr,0,0,dpr,0,0);
+  // 竖屏收窄、横屏放宽；都用可用宽度的比例，避免窄机两轨被裁
+  const box = V.portrait ? Math.min(V.w*0.94, 460) : Math.min(V.w*0.92, 560);
+  const laneW = box / LANES;
+  V.laneW = laneW; V.laneX = (V.w - laneW*LANES)/2;
+  V.judgeY = V.h - Math.max(84, V.h*(V.portrait ? 0.135 : 0.145));
+  V.topY = -laneW*0.4;
+}
+addEventListener('resize', resize);
+/* iOS 上 orientationchange 后视口尺寸是延迟更新的，多打几次 */
+function resizeSoon(){
+  resize();
+  setTimeout(resize, 90);
+  setTimeout(resize, 260);
+  setTimeout(resize, 620);
+}
+addEventListener('orientationchange', resizeSoon);
+if(window.screen && screen.orientation && screen.orientation.addEventListener){
+  screen.orientation.addEventListener('change', resizeSoon);
+}
+if(window.visualViewport){
+  visualViewport.addEventListener('resize', resizeSoon);
+  visualViewport.addEventListener('scroll', ()=>{ if(S.screen==='game') resize(); });
+}
+
+/* ---------- 谱面 ---------- */
+function chartFor(id){
+  const raw = SONG.charts[id] || [];
+  return raw.map(n=>({t:n[0], lane:n[1], hold:n[2]||0, hit:false, missed:false, judged:false, holding:false, done:false}))
+            .sort((a,b)=>a.t-b.t);
+}
+const approach = () => 1.55 / S.speed;
+
+/* ---------- 粒子 ---------- */
+const parts = [];
+function burst(x,y,color,n=14,power=1){
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2, sp=(1.2+Math.random()*4.2)*power;
+    parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.4,life:1,decay:0.016+Math.random()*0.02,color,r:1.6+Math.random()*2.8});
+  }
+}
+function dustUpdate(dt){
+  fctx.clearRect(0,0,V.w,V.h);
+  for(let i=parts.length-1;i>=0;i--){
+    const p = parts[i];
+    p.x += p.vx*dt*60; p.y += p.vy*dt*60; p.vy += 0.12*dt*60; p.vx*=0.985; p.life -= p.decay*dt*60;
+    if(p.life<=0){ parts.splice(i,1); continue; }
+    fctx.globalAlpha = Math.max(0,p.life)*0.9;
+    fctx.fillStyle = p.color;
+    fctx.beginPath(); fctx.arc(p.x,p.y,p.r*p.life,0,6.283); fctx.fill();
+  }
+  fctx.globalAlpha = 1;
+}
+
+/* ---------- 判定 ---------- */
+let fxRings = [];
+function judge(lane, ts){
+  if(S.auto) return;
+  const now = ts;
+  let best=null, bestAbs=1e9;
+  for(const n of S.chart){
+    if(n.hit || n.lane!==lane || n.hold) continue;
+    const d = Math.abs(n.t - now);
+    if(d < bestAbs && d <= WIN.MISS){ best=n; bestAbs=d; }
+  }
+  // 长条头
+  if(!best){
+    for(const n of S.chart){
+      if(n.hit || n.lane!==lane || !n.hold || n.holding) continue;
+      const d = Math.abs(n.t - now);
+      if(d < bestAbs && d <= WIN.MISS){ best=n; bestAbs=d; }
+    }
+  }
+  if(!best) return;
+  let j = 'MISS';
+  if(bestAbs<=WIN.PERFECT) j='PERFECT'; else if(bestAbs<=WIN.GREAT) j='GREAT'; else if(bestAbs<=WIN.GOOD) j='GOOD';
+  if(j==='MISS') return;
+  best.hit = true; best.judged = true; best.holding = !!best.hold;
+  if(best.hold){ best.holdStart = now; best.holdNeed = best.hold; }
+  registerHit(best, j, lane);
+}
+function registerHit(note, j, lane){
+  S.judge[j]++;
+  S.accSum += ACC_VAL[j]; S.accCount++;
+  if(j==='MISS'){ S.combo=0; }
+  else {
+    S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
+    const mult = S.fever?1.5:1;
+    S.score += Math.round(SCORE_VAL[j]*mult*(1+Math.min(S.combo,120)/300));
+  }
+  if(S.combo>=50 && !S.fever){ S.fever = true; document.body.classList.add('fever'); }
+  if(S.combo<50 && S.fever){ S.fever=false; document.body.classList.remove('fever'); }
+
+  const x = V.laneX + V.laneW*(lane+0.5);
+  const color = LANE_COLORS[lane];
+  if(j!=='MISS'){
+    fxRings.push({x,y:V.judgeY,r:V.laneW*0.18,max:V.laneW*0.92,life:1,color});
+    burst(x, V.judgeY, color, j==='PERFECT'?16:9, j==='PERFECT'?1.15:0.8);
+  }
+  showJudge(j);
+  updHud();
+  const arena = $('#catArena');
+  arena.classList.remove('hit','miss');
+  void arena.offsetWidth;
+  arena.classList.add(j==='MISS'?'miss':'hit');
+  document.body.classList.toggle('perfect', j==='PERFECT');
+  if(j==='PERFECT') setTimeout(()=>document.body.classList.remove('perfect'), 90);
+}
+function showJudge(j){
+  const el = $('#judgeText');
+  el.className = ''; el.textContent = j;
+  void el.offsetWidth;
+  el.className = 'show j-'+j;
+}
+
+/* ---------- HUD ---------- */
+let lastScoreShown = 0;
+function accNow(){ return S.accCount? (S.accSum/S.accCount*100) : 100; }
+function updHud(){
+  $('#accLbl').textContent = accNow().toFixed(2)+'%';
+  $('#comboMini').textContent = S.combo + ' COMBO';
+  $('#progBar').style.width = Math.min(100, Math.max(0, (S.t / S.dur)*100)) + '%';
+  const cb = $('#comboBox');
+  if(S.combo>=3){ cb.classList.add('on'); $('#comboNum').textContent = S.combo;
+    const cn=$('#comboNum'); cn.classList.remove('pop'); void cn.offsetWidth; cn.classList.add('pop');
+  } else { cb.classList.remove('on'); }
+}
+function tickHud(){
+  if(S.score !== lastScoreShown){
+    const d = S.score - lastScoreShown;
+    lastScoreShown += Math.sign(d)*Math.max(1, Math.ceil(Math.abs(d)*0.22));
+    if(Math.abs(S.score-lastScoreShown)<2) lastScoreShown = S.score;
+    $('#scoreLbl').textContent = lastScoreShown.toLocaleString('en-US');
+  }
+}
+
+/* ---------- 歌词 ---------- */
+let lyricIdx = -1;
+function updLyric(t){
+  const L = S.lyrics;
+  let i = -1;
+  for(let k=0;k<L.length;k++){ if(L[k].t <= t + 0.06) i = k; else break; }
+  if(i !== lyricIdx){
+    lyricIdx = i;
+    $('#lyricNow').textContent = i>=0 ? L[i].text : '';
+    $('#lyricNow').style.opacity = i>=0 ? 1 : 0;
+    $('#lyricNext').textContent = (i+1<L.length) ? L[i+1].text : '';
+  }
+}
+
+/* ---------- 渲染 ---------- */
+let bgPhase = 0;
+function drawPlayfield(t){
+  const {laneX, laneW, judgeY} = V;
+  pctx.clearRect(0,0,V.w,V.h);
+  const totalW = laneW*LANES;
+
+  // 轨道背景
+  const g = pctx.createLinearGradient(0, judgeY-1, 0, 0);
+  g.addColorStop(0,'rgba(255,255,255,.075)');
+  g.addColorStop(0.45,'rgba(255,255,255,.028)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  pctx.fillStyle = g;
+  pctx.fillRect(laneX, 0, totalW, judgeY);
+  // 每轨色晕
+  for(let i=0;i<LANES;i++){
+    const lg2 = pctx.createLinearGradient(0, judgeY, 0, judgeY*0.25);
+    lg2.addColorStop(0, hexA(LANE_COLORS[i], 0.085));
+    lg2.addColorStop(1, hexA(LANE_COLORS[i], 0));
+    pctx.fillStyle = lg2;
+    pctx.fillRect(laneX + laneW*i + 1, 0, laneW-2, judgeY);
+  }
+
+  // 分隔线
+  for(let i=0;i<=LANES;i++){
+    const x = laneX + i*laneW;
+    pctx.strokeStyle = 'rgba(255,255,255,'+(i===0||i===LANES?0.16:0.075)+')';
+    pctx.lineWidth = 1;
+    pctx.beginPath(); pctx.moveTo(x, Math.max(0, judgeY-V.h)); pctx.lineTo(x, judgeY); pctx.stroke();
+  }
+
+  // 重音脉冲（跟随真实音频重音，非固定网格）
+  let pulse = 0;
+  if(S.accents && S.accents.length){
+    for(let i=0;i<S.accents.length;i++){
+      const dt = t - S.accents[i];
+      if(dt >= 0 && dt < 0.34) pulse = Math.max(pulse, 1 - dt/0.34);
+      else if(S.accents[i] - t > 0.34 && dt < 0) break;
+    }
+  }
+  if(pulse > 0.01){
+    pctx.fillStyle = 'rgba(255,196,150,'+(0.030*pulse)+')';
+    pctx.fillRect(laneX, 0, totalW, judgeY);
+  }
+
+  // 长条（先画，位于音符层下方）
+  const ap = approach();
+  for(const n of S.chart){
+    if(!n.hold) continue;
+    const headY = judgeY - ((n.t - t)/ap)*(judgeY - V.topY);
+    const tailY = judgeY - ((n.t + n.hold - t)/ap)*(judgeY - V.topY);
+    if(headY < -60 && tailY < -60) continue;
+    if(tailY > judgeY + 20) continue;
+    const x = laneX + laneW*n.lane;
+    const w = laneW*0.62, cx = x + laneW/2;
+    const active = n.holding;
+    pctx.save();
+    pctx.globalAlpha = active? 0.95 : (n.hit? 0.25 : 0.72);
+    const hg = pctx.createLinearGradient(0, Math.max(tailY, -40), 0, Math.min(headY, judgeY));
+    hg.addColorStop(0, hexA(LANE_COLORS[n.lane], active?0.95:0.35));
+    hg.addColorStop(1, hexA(LANE_COLORS[n.lane], active?0.55:0.18));
+    pctx.fillStyle = hg;
+    roundRect(pctx, cx-w/2, Math.max(tailY,-60), w, Math.max(6, Math.min(headY,judgeY)-Math.max(tailY,-60)), 12);
+    pctx.fill();
+    pctx.strokeStyle = hexA(LANE_COLORS[n.lane], active?0.9:0.5);
+    pctx.lineWidth = active?2.5:1.4;
+    pctx.stroke();
+    pctx.restore();
+  }
+
+  // 音符
+  for(const n of S.chart){
+    if(n.hit) continue;
+    const dt = n.t - t;
+    if(dt > ap + 0.2 || dt < -0.24) continue;
+    const y = judgeY - (dt/ap)*(judgeY - V.topY);
+    if(y < -laneW*0.7) continue;
+    drawNote(n, y);
+  }
+
+  // 判定线（分轨彩色）
+  pctx.save();
+  pctx.shadowBlur = 22;
+  for(let i=0;i<LANES;i++){
+    pctx.shadowColor = LANE_COLORS[i];
+    pctx.fillStyle = hexA(LANE_COLORS[i], 0.92);
+    pctx.fillRect(laneX + laneW*i + 1.5, judgeY-1.5, laneW-3, 3);
+  }
+  pctx.shadowColor = 'rgba(255,225,190,.9)';
+  pctx.fillStyle = 'rgba(255,255,255,.55)';
+  pctx.fillRect(laneX-16, judgeY-0.8, totalW+32, 1.6);
+  pctx.restore();
+  const glow = pctx.createLinearGradient(0, judgeY-56, 0, judgeY+16);
+  glow.addColorStop(0,'rgba(255,190,140,0)');
+  glow.addColorStop(1,'rgba(255,190,140,.16)');
+  pctx.fillStyle = glow;
+  pctx.fillRect(laneX-18, judgeY-56, totalW+36, 72);
+
+  // 按键 Receptor
+  for(let i=0;i<LANES;i++){
+    const x = laneX + laneW*i;
+    const pressed = pressedLanes[i] > t - 0.075;
+    const w = laneW*0.66;
+    pctx.save();
+    pctx.globalAlpha = pressed?1:0.85;
+    pctx.strokeStyle = hexA(LANE_COLORS[i], pressed?1:0.6);
+    pctx.lineWidth = pressed?3.2:2;
+    pctx.shadowColor = LANE_COLORS[i]; pctx.shadowBlur = pressed?26:10;
+    roundRect(pctx, x + (laneW-w)/2, judgeY-13, w, 26, 9);
+    pctx.stroke();
+    if(pressed){ pctx.fillStyle = hexA(LANE_COLORS[i], .26); pctx.fill(); }
+    pctx.shadowBlur = 0;
+    pctx.fillStyle = hexA(LANE_COLORS[i], pressed?1:0.62);
+    pctx.font = '700 '+Math.round(laneW*0.19)+'px "PingFang SC","Microsoft YaHei",sans-serif';
+    pctx.textAlign='center'; pctx.textBaseline='middle';
+    pctx.fillText(LANE_KEYS[i], x + laneW/2, judgeY);
+    pctx.restore();
+  }
+
+  // 判定环
+  for(let i=fxRings.length-1;i>=0;i--){
+    const r = fxRings[i];
+    r.life -= 0.055; r.r += (r.max-r.r)*0.22;
+    if(r.life<=0){ fxRings.splice(i,1); continue; }
+    pctx.save();
+    pctx.globalAlpha = Math.max(0,r.life)*0.85;
+    pctx.strokeStyle = r.color; pctx.lineWidth = 3.4*r.life+0.6;
+    pctx.shadowColor = r.color; pctx.shadowBlur = 22;
+    pctx.beginPath(); pctx.ellipse(r.x, r.y, r.r, r.r*0.42, 0, 0, 6.283); pctx.stroke();
+    pctx.restore();
+  }
+}
+
+function drawNote(n, y){
+  const {laneX, laneW, judgeY} = V;
+  const cx = laneX + laneW*(n.lane+0.5);
+  const w = laneW*0.66, h = laneW*0.24;
+  const c = LANE_COLORS[n.lane];
+  pctx.save();
+  pctx.shadowColor = c; pctx.shadowBlur = 18;
+  const ng = pctx.createLinearGradient(cx-w/2, y-h/2, cx+w/2, y+h/2);
+  ng.addColorStop(0, '#ffffff');
+  ng.addColorStop(0.35, c);
+  ng.addColorStop(1, hexA(c,.55));
+  pctx.fillStyle = ng;
+  roundRect(pctx, cx-w/2, y-h/2, w, h, h/2);
+  pctx.fill();
+  pctx.shadowBlur = 0;
+  pctx.fillStyle = 'rgba(255,255,255,.75)';
+  roundRect(pctx, cx-w/2+4, y-h/2+3, w-8, h*0.3, h*0.2);
+  pctx.fill();
+  pctx.strokeStyle = 'rgba(255,255,255,.9)'; pctx.lineWidth = 1.2;
+  roundRect(pctx, cx-w/2, y-h/2, w, h, h/2); pctx.stroke();
+  pctx.restore();
+}
+function roundRect(ctx,x,y,w,h,r){
+  r = Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function hexA(hex,a){
+  const h = hex.replace('#','');
+  const n = parseInt(h.length===3? h.split('').map(c=>c+c).join('') : h, 16);
+  return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';
+}
+
+/* ---------- 主循环 ---------- */
+let raf=0, prevT=0;
+const pressedLanes = [ -9,-9,-9,-9 ];
+function loop(ts){
+  raf = requestAnimationFrame(loop);
+  padPoll();
+  if(Math.abs(V.w - (pf.clientWidth||innerWidth)) > 1 || Math.abs(V.h - (pf.clientHeight||innerHeight)) > 1) resize();
+  const now = songTime();
+  const dt = Math.min(0.05, Math.max(0, now - prevT));
+  prevT = now;
+  if(S.screen!=='game'){ dustUpdate(dt||0.016); return; }
+  S.t = now;
+
+  // 自动演示
+  if(S.auto && S.playing){
+    for(const n of S.chart){
+      if(n.hit) continue;
+      if(n.t <= now + 0.001 && now - n.t < 0.2){
+        n.hit = true; n.judged = true;
+        if(n.hold){ n.holding = true; n.holdStart = now; n.holdNeed = n.hold; }
+        registerHit(n, 'PERFECT', n.lane);
+      }
+    }
+  }
+
+  // 漏判
+  for(const n of S.chart){
+    if(!n.hit && now - n.t > WIN.MISS + 0.02){
+      n.hit = true; n.missed = true; n.judged = true;
+      S.judge.MISS++; S.accSum += 0; S.accCount++; S.combo = 0;
+      if(S.fever){ S.fever=false; document.body.classList.remove('fever'); }
+      showJudge('MISS'); updHud();
+      const arena=$('#catArena'); arena.classList.remove('hit','miss'); void arena.offsetWidth; arena.classList.add('miss');
+    }
+    // 长条结束奖励
+    if(n.hold && n.holding && now >= n.t + n.hold){
+      n.holding = false; n.done = true;
+      S.score += Math.round(150*(S.fever?1.5:1));
+      const x=V.laneX+V.laneW*(n.lane+0.5);
+      burst(x,V.judgeY,LANE_COLORS[n.lane],8,0.8);
+    }
+  }
+  // 长按中断
+  for(const n of S.chart){
+    if(n.hold && n.holding && !keysDown[n.lane] && !S.auto){
+      n.holding = false;
+    }
+  }
+
+  drawPlayfield(now);
+  dustUpdate(dt||0.016);
+  updLyric(now);
+  tickHud();
+  if(S.combo!==undefined) $('#progBar').style.width = Math.max(0, Math.min(100, now/S.dur*100))+'%';
+
+  if(now >= S.dur - 0.15){ finish(); }
+  if(!S.playing && !S.paused && now > 0.2 && now >= S.dur - 0.3){ finish(); }
+}
+
+/* ---------- 输入 ----------
+   三个输入源（键盘 / 手柄 / 触屏）各自记录，再合成 keysDown，
+   避免「手指抬起」把键盘正在按住的长条也一起断掉。 */
+const keysDown = [false,false,false,false];
+const kbdDown  = [false,false,false,false];
+const padDown  = [false,false,false,false];
+const ptrDown  = [0,0,0,0];              // 触屏：每轨按住的指针数
+function syncDown(i){
+  const v = kbdDown[i] || padDown[i] || ptrDown[i] > 0;
+  if(keysDown[i] !== v) keysDown[i] = v;
+}
+
+/* 事件时间戳比处理时刻更接近真实按下瞬间：用它换算歌曲时间，
+   再扣掉触屏采样延迟，判定会明显更"准手" */
+const TOUCH_LEAD = 0.018;
+function eventTime(e){
+  const now = songTime();
+  let lag = 0;
+  if(e && e.timeStamp > 0 && window.performance){
+    lag = (performance.now() - e.timeStamp) / 1000;
+    if(lag < 0 || lag > 0.12) lag = 0;
+  }
+  const extra = (e && e.pointerType === 'touch') ? TOUCH_LEAD : 0;
+  return now - lag - extra;
+}
+
+function pressLane(lane, ts){
+  pressedLanes[lane] = ts;
+  if(S.screen==='game' && !S.paused){
+    const x = V.laneX + V.laneW*(lane+0.5);
+    fxRings.push({x, y:V.judgeY, r:V.laneW*0.16, max:V.laneW*0.52, life:1, color:LANE_COLORS[lane]});
+    judge(lane, ts);
+  }
+}
+
+addEventListener('keydown', e=>{
+  if(e.code==='Escape'){
+    if(S.screen==='game'){ S.paused? resume() : pause(); }
+    return;
+  }
+  if(S.screen==='title' && (e.code==='Space'||e.code==='Enter')){ e.preventDefault(); start(); return; }
+  if(S.screen==='result' && (e.code==='Enter'||e.code==='Space')){ e.preventDefault(); start(); return; }
+  const lane = KEYMAP[e.code];
+  if(lane===undefined) return;
+  e.preventDefault();
+  if(e.repeat || kbdDown[lane]) return;
+  kbdDown[lane]=true; syncDown(lane);
+  pressLane(lane, eventTime(e));
+});
+addEventListener('keyup', e=>{
+  const lane = KEYMAP[e.code];
+  if(lane===undefined) return;
+  kbdDown[lane]=false; syncDown(lane);
+});
+addEventListener('blur', ()=>{ for(let i=0;i<4;i++){ kbdDown[i]=false; syncDown(i); } });
+
+function laneFromX(x){
+  const i = Math.floor((x - V.laneX)/V.laneW);
+  return Math.max(0, Math.min(LANES-1, i));
+}
+
+/* 触屏：按位置定轨道；按住后横向滑到别的轨道会立刻在新轨道再触发一次 */
+const activePtr = new Map();
+function ptrPress(e, lane){
+  activePtr.set(e.pointerId, lane);
+  ptrDown[lane]++; syncDown(lane);
+  pressLane(lane, eventTime(e));
+}
+function ptrRelease(e){
+  const lane = activePtr.get(e.pointerId);
+  if(lane === undefined) return;
+  activePtr.delete(e.pointerId);
+  if(ptrDown[lane] > 0) ptrDown[lane]--;
+  syncDown(lane);
+}
+pf.addEventListener('pointerdown', e=>{
+  if(S.screen!=='game' || S.paused) return;
+  // 顶部 HUD 与暂停键区域不参与判定，避免误触
+  if(e.clientY < V.h*0.14) return;
+  if(e.target && e.target.closest && e.target.closest('#pauseBtn')) return;
+  if(pf.setPointerCapture){ try{ pf.setPointerCapture(e.pointerId); }catch(err){} }
+  e.preventDefault();
+  const lane = laneFromX(e.clientX);
+  if(ptrDown[lane] > 0 && activePtr.get(e.pointerId) === lane) return;
+  ptrPress(e, lane);
+}, { passive: false });
+pf.addEventListener('pointermove', e=>{
+  const cur = activePtr.get(e.pointerId);
+  if(cur === undefined) return;
+  const lane = laneFromX(e.clientX);
+  if(lane === cur) return;
+  // 滑到相邻轨道：旧轨道松开，新轨道立即判定
+  if(ptrDown[cur] > 0) ptrDown[cur]--;
+  syncDown(cur);
+  ptrPress(e, lane);
+}, { passive: true });
+pf.addEventListener('pointerup', ptrRelease);
+pf.addEventListener('pointercancel', ptrRelease);
+pf.addEventListener('pointerleave', function(e){
+  if(e.pointerType !== 'touch' && activePtr.has(e.pointerId)) ptrRelease(e);
+});
+addEventListener('blur', ()=>{ activePtr.clear(); for(let i=0;i<4;i++){ ptrDown[i]=0; syncDown(i); } });
+
+/* ---------- 手柄 ---------- */
+const PAD = { on:false, name:'', lanePrev:[false,false,false,false], btnPrev:{}, lastMenu:0 };
+const PAD_LANE_BTN = {0:0, 1:1, 2:2, 3:3, 12:0, 13:1, 14:2, 15:3};   // A/B/X/Y + 十字键
+function padBadge(txt){
+  let b = $('#padBadge');
+  if(!b){
+    b = document.createElement('div');
+    b.id = 'padBadge';
+    document.body.appendChild(b);
+  }
+  b.textContent = txt || '';
+  b.classList.toggle('on', !!txt);
+}
+function padMenu(action){
+  if(action==='start'){
+    if(S.screen==='title') start();
+    else if(S.screen==='result') setScreen('title');
+    else if(S.screen==='game'){ S.paused ? resume() : pause(); }
+  }else if(action==='back'){
+    if(S.screen==='game'){ S.paused ? resume() : pause(); }
+  }
+}
+function padPoll(){
+  if(!navigator.getGamepads) return;
+  let gp = null;
+  try{ gp = navigator.getGamepads(); }catch(e){ return; }
+  let pad = null;
+  for(let i=0;i<gp.length;i++){ if(gp[i] && gp[i].connected){ pad = gp[i]; break; } }
+  if(!pad){
+    if(PAD.on){ PAD.on = false; PAD.lanePrev = [false,false,false,false]; padBadge(''); }
+    return;
+  }
+  if(!PAD.on){
+    PAD.on = true; PAD.name = (pad.id || '手柄');
+    padBadge('🎮 ' + PAD.name.replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,22));
+  }
+
+  /* 按键 → 轨道 */
+  const down = [false,false,false,false];
+  for(const k in PAD_LANE_BTN){
+    const b = pad.buttons[k];
+    if(b && (b.pressed || (b.value || 0) > 0.5)) down[PAD_LANE_BTN[k]] = true;
+  }
+  /* 左摇杆 */
+  const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+  if(ax < -0.55) down[0] = true;
+  if(ax >  0.55) down[3] = true;
+  if(ay < -0.55) down[2] = true;
+  if(ay >  0.55) down[1] = true;
+
+  if(S.screen==='game' && !S.paused){
+    for(let i=0;i<4;i++){
+      if(down[i] === PAD.lanePrev[i]) continue;
+      PAD.lanePrev[i] = down[i];
+      if(down[i]){
+        if(padDown[i]) continue;
+        padDown[i] = true; syncDown(i);
+        pressLane(i, eventTime(null));
+      }else{
+        padDown[i] = false; syncDown(i);
+      }
+    }
+  }else{
+    for(let i=0;i<4;i++){
+      PAD.lanePrev[i] = down[i];
+      if(!down[i] && padDown[i]){ padDown[i] = false; syncDown(i); }
+    }
+  }
+
+  /* 菜单键：Start(9) / Back(8) */
+  const now = performance.now();
+  [[9,'start'],[8,'back']].forEach(([bi,act])=>{
+    const b = pad.buttons[bi];
+    const on = !!(b && (b.pressed || (b.value||0) > 0.5));
+    if(on && !PAD.btnPrev[bi] && now - PAD.lastMenu > 260){ PAD.lastMenu = now; padMenu(act); }
+    PAD.btnPrev[bi] = on;
+  });
+}
+addEventListener('gamepadconnected', e=>{
+  PAD.on = true; PAD.name = e.gamepad.id;
+  padBadge('🎮 ' + PAD.name.replace(/\s*\(.*?\)\s*/g,' ').trim().slice(0,22));
+});
+addEventListener('gamepaddisconnected', ()=>{ PAD.on = false; padBadge(''); });
+
+/* ---------- 流程 ---------- */
+function setScreen(name){
+  S.screen = name;
+  document.body.classList.toggle('gaming', name==='game');
+  [titleScreen, gameScreen, resultScreen].forEach(el=>el.classList.remove('on'));
+  ({title:titleScreen, game:gameScreen, result:resultScreen})[name].classList.add('on');
+}
+function start(){
+  if(!abuf && !audioEl && audioMode!=='clock') return;
+  if(typeof window.__beforeStart === 'function' && window.__beforeStart() === false) return;
+  unlockAudio();
+  S.chart = chartFor(S.diff);
+  S.judge = {PERFECT:0,GREAT:0,GOOD:0,MISS:0};
+  S.combo=0; S.maxCombo=0; S.score=0; S.accSum=0; S.accCount=0; S.fever=false; S.t=0;
+  lastScoreShown=0; lyricIdx=-1; parts.length=0; fxRings.length=0;
+  document.body.classList.remove('fever');
+  $('#scoreLbl').textContent='0'; $('#accLbl').textContent='100.00%'; $('#comboMini').textContent='0 COMBO';
+  $('#diffTag').textContent = DIFFS.find(d=>d.id===S.diff).name + ' · ' + S.chart.length + ' NOTES';
+  $('#lyricNow').textContent=''; $('#lyricNext').textContent='';
+  setScreen('game');
+  resize();
+  pausedAt = 0; prevT = 0;
+  startAudio(0);
+  if(!raf) raf = requestAnimationFrame(loop);
+}
+function pause(){
+  if(S.screen!=='game' || S.paused) return;
+  S.paused = true; pausedAt = songTime(); stopAudio();
+  $('#pauseOverlay').classList.add('on');
+}
+function resume(){
+  if(!S.paused) return;
+  S.paused = false; $('#pauseOverlay').classList.remove('on');
+  startAudio(pausedAt);
+}
+function finish(){
+  if(S.screen==='result') return;
+  stopAudio(); S.playing=false;
+  const total = S.judge.PERFECT+S.judge.GREAT+S.judge.GOOD+S.judge.MISS;
+  const acc = total? (S.accSum/S.accCount*100):0;
+  let rank='C';
+  if(acc>=99) rank='SSS'; else if(acc>=97) rank='SS'; else if(acc>=93) rank='S';
+  else if(acc>=88) rank='A'; else if(acc>=80) rank='B';
+  if(S.judge.MISS===0 && total>0 && acc>=99.5) rank='SSS';
+  const prevBest = store.best();
+  const isNew = S.score > prevBest;
+  store.set(S.score);
+  $('#resDiff').textContent = DIFFS.find(d=>d.id===S.diff).name;
+  $('#resRank').textContent = rank;
+  $('#resScore').innerHTML = S.score.toLocaleString('en-US') + (isNew&&S.score>0?'<span class="newrec">NEW</span>':'');
+  $('#resP').textContent = S.judge.PERFECT; $('#resG').textContent = S.judge.GREAT;
+  $('#resO').textContent = S.judge.GOOD; $('#resM').textContent = S.judge.MISS;
+  $('#resAcc').textContent = acc.toFixed(2)+'%';
+  $('#resCombo').textContent = S.maxCombo;
+  $('#resNotes').textContent = total;
+  $('#resAccBar').style.width = acc+'%';
+  ['#resRank'].forEach(s=>{ const el=$(s); el.style.animation='none'; void el.offsetWidth; el.style.animation=''; });
+  setScreen('result');
+  refreshBest();
+  if(typeof window.__onFinish === 'function'){
+    try{
+      window.__onFinish({
+        diff: S.diff, score: S.score, acc: acc, notes: total,
+        judge: {PERFECT:S.judge.PERFECT, GREAT:S.judge.GREAT, GOOD:S.judge.GOOD, MISS:S.judge.MISS},
+        maxCombo: S.maxCombo, dur: Math.max(0, S.t || 0)
+      });
+    }catch(e){ console.warn('[platform] onFinish 失败', e); }
+  }
+}
+
+/* ---------- 标题页装配 ---------- */
+function buildDiffs(){
+  const wrap = $('#diffs');
+  wrap.innerHTML = '';
+  DIFFS.forEach(d=>{
+    const n = (SONG.charts[d.id]||[]).length;
+    const el = document.createElement('div');
+    el.className = 'diff' + (d.id===S.diff?' sel':'');
+    el.dataset.id = d.id;
+    el.innerHTML = '<div class="cnt">'+n+' NOTES</div><div class="dn" style="color:'+d.color+'">'+d.name+'</div>'
+      + '<div class="ds">'+d.cn+'</div><div class="stars">'+d.stars+'</div>';
+    el.onclick = ()=>{
+      S.diff = d.id;
+      [...wrap.children].forEach(c=>c.classList.toggle('sel', c.dataset.id===d.id));
+      refreshBest();
+    };
+    wrap.appendChild(el);
+  });
+}
+function refreshBest(){
+  const b = store.best();
+  $('#bestLbl').textContent = b>0 ? Math.round(b).toLocaleString('en-US') : '—';
+}
+function fmtDur(s){
+  const m = Math.floor(s/60), ss = Math.floor(s%60);
+  return m+':'+String(ss).padStart(2,'0');
+}
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && S.screen==='game' && !S.paused && S.playing) pause();
+});
+
+/* ---------- 设置 ---------- */
+function bindSettings(){
+  const offRange=$('#offRange'), offVal=$('#offVal'), offRange2=$('#offRange2'), offVal2=$('#offVal2');
+  const spdRange=$('#spdRange'), spdVal=$('#spdVal'), volRange=$('#volRange'), volVal=$('#volVal'), autoSw=$('#autoSw');
+  const syncOff = v=>{ S.offset = v; offRange.value=v; offRange2.value=v; offVal.textContent=v+' ms'; offVal2.textContent=v+' ms'; };
+  offRange.oninput = ()=> syncOff(+offRange.value);
+  offRange2.oninput = ()=> syncOff(+offRange2.value);
+  spdRange.oninput = ()=>{ S.speed = +spdRange.value; spdVal.textContent = S.speed.toFixed(2).replace(/0$/,'')+'×'; };
+  volRange.oninput = ()=>{ setVolume(+volRange.value/100); volVal.textContent = volRange.value+'%'; };
+  autoSw.onclick = ()=>{ S.auto = !S.auto; autoSw.classList.toggle('on', S.auto); };
+
+  $('#settingBtn').onclick = ()=> $('#settingOverlay').classList.add('on');
+  $('#settingClose').onclick = ()=> $('#settingOverlay').classList.remove('on');
+  $('#helpBtn').onclick = ()=> $('#helpOverlay').classList.add('on');
+  $('#helpClose').onclick = ()=> $('#helpOverlay').classList.remove('on');
+  $('#startBtn').onclick = ()=> start();
+  $('#retryBtn').onclick = ()=> start();
+  $('#backBtn').onclick = ()=> { setScreen('title'); refreshBest(); };
+  $('#pauseBtn').onclick = ()=>{ pause(); };
+  $('#resumeBtn').onclick = ()=> resume();
+  $('#quitBtn').onclick = ()=>{
+    stopAudio(); S.playing=false; S.paused=false;
+    $('#pauseOverlay').classList.remove('on');
+    document.body.classList.remove('fever');
+    setScreen('title'); refreshBest();
+  };
+}
+
+/* ---------- 启动 ---------- */
+/* 音轨彻底失败时的兜底面板：重试 / 静音试玩（用 performance 时钟走谱面） */
+function bootFail(err){
+  const box = $('#loading');
+  if(!box) return;
+  box.classList.remove('off');
+  $('#loadTxt').textContent = '音轨载入失败';
+  let tip = $('#loadErr');
+  if(!tip){
+    tip = document.createElement('div');
+    tip.id = 'loadErr'; tip.className = 'load-err';
+    box.appendChild(tip);
+  }
+  tip.innerHTML = '<div class="le-msg">' + ((err && err.message) || '未知错误') + '</div>'
+    + '<div class="le-tip">iOS / Safari 打开本地 HTML 时可能禁止读取音频。<br/>可先"静音试玩"（节拍仍按音轨时间轴走），或把文件放到 http 服务下再打开。</div>'
+    + '<div class="le-acts"><button class="btn" id="loadRetry">重试</button>'
+    + '<button class="btn ghost" id="loadSkip">静音试玩</button></div>';
+  $('#loadRetry').onclick = ()=> location.reload();
+  $('#loadSkip').onclick = ()=>{
+    audioMode = 'clock';
+    S.dur = SONG.meta.duration;
+    tip.remove();
+    proceed();
+  };
+}
+
+async function boot(){
+  // 注入角色
+  document.querySelectorAll('.cat-art').forEach(n=>{ n.innerHTML = CAT_SVG; });
+  const tc = document.querySelector('#catTitle svg');
+  if(tc) tc.classList.add('float');
+  try{
+    await loadAudio();
+    $('#loadTxt').textContent = '准备就绪';
+  }catch(err){
+    console.error(err);
+    bootFail(err);
+    return;
+  }
+  proceed();
+}
+
+function proceed(){
+  window.__loaded = true;
+  if(!S.dur || !isFinite(S.dur) || S.dur <= 0) S.dur = SONG.meta.duration;
+  S.lyrics = SONG.lyrics || [];
+  S.accents = SONG.accents || [];
+  $('#bpmLbl').textContent = SONG.meta.bpm ? SONG.meta.bpm.toFixed(1) : '--';
+  $('#durLbl').textContent = fmtDur(S.dur);
+  buildDiffs(); refreshBest(); bindSettings();
+  resize();
+  raf = requestAnimationFrame(loop);
+  setTimeout(()=> $('#loading').classList.add('off'), 320);
+  if(typeof window.__onBoot === 'function'){ try{ window.__onBoot(); }catch(e){ console.warn('[platform] boot 失败', e); } }
+  const mode = (location.hash||'').replace('#','');
+  if(mode==='demo' || mode==='auto'){
+    S.auto = true; $('#autoSw').classList.add('on');
+    setTimeout(()=>{ start(); }, 420);
+  }
+}
+try{ boot(); }catch(e){ console.error(e); bootFail(e); }
+</script>
+<script>
+__PLATFORM_JS__
+</script>
+</body>
+</html>
