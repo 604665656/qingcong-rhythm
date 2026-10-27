@@ -354,6 +354,55 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   T('装扮页有右上角 ✕ 关闭', cl.hasX && cl.afterX === false, 'x=' + cl.hasX + ' stillOpen=' + cl.afterX);
   T('点面板背景也能关闭装扮页', cl.afterBg === false, 'stillOpen=' + cl.afterBg);
 
+  /* ---- 9. 排行榜按模式分榜 + 新模式预留 ---- */
+  const lb1 = await ev(`(function(){
+    try{
+      var P = window.PLAT || {};
+      var mb = P.MODE_BOARD || {};
+      var keys = Object.keys(mb);
+      var vals = keys.map(function(k){ return mb[k]; });
+      var maxBoard = Math.max.apply(null, vals);
+      // 模式入口：九宫格 / 连线已预留
+      var ids = MODES.map(function(m){ return m.id; });
+      var soon = MODES.filter(function(m){ return m.soon; }).map(function(m){ return m.name; });
+      var playable = playableModes().map(function(m){ return m.id; });
+      // 本机最佳按「模式+难度」分开存
+      var oldMode = S.mode;
+      S.mode='classic'; var k1 = store.k;
+      S.mode='taiko';   var k2 = store.k;
+      S.mode = oldMode;
+      return JSON.stringify({keys:keys, maxBoard:maxBoard, ids:ids, soon:soon,
+        playable:playable, k1:k1, k2:k2});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const lb = J(lb1, 'lb');
+  T('排行榜按模式分榜且不超过 5 个', lb.keys.length === 4 && lb.maxBoard <= 5,
+    'boards=' + lb.keys.join(',') + ' max=' + lb.maxBoard);
+  T('太鼓与节奏用不同榜号', (lb.keys.indexOf('classic') >= 0 && lb.keys.indexOf('taiko') >= 0), 'keys=' + lb.keys.join(','));
+  T('九宫格 / 连线已预留入口且标记敬请期待', lb.soon.length === 2 && lb.soon.join('、').indexOf('九宫格') >= 0,
+    'soon=' + lb.soon.join('、'));
+  T('模式循环只在已实现模式间进行', lb.playable.length === 2 && lb.playable.join(',') === 'classic,taiko',
+    'playable=' + lb.playable.join(','));
+  T('本机最佳分按模式分开存（太鼓不混下落）', lb.k1 !== lb.k2 && /taiko/.test(lb.k2), 'k1=' + lb.k1 + ' k2=' + lb.k2);
+
+  const lb2 = await ev(`(function(){
+    try{
+      // 结算上报要带上 mode，平台层才能选对榜
+      window.__cap = null;
+      window.__onFinish = function(r){ window.__cap = r; };
+      ACH = {}; localStorage.removeItem('qc_ach');
+      S.screen='game'; S.mode='taiko';
+      S.judge={PERFECT:10,GREAT:0,GOOD:0,MISS:0};
+      S.maxCombo=10; S.score=12345; S.accSum=10; S.accCount=10; S.t=5;
+      finish();
+      var c = window.__cap || {};
+      return JSON.stringify({mode:c.mode, song:c.song, score:c.score, diff:c.diff});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const lb3 = J(lb2, 'lb2');
+  T('结算上报带上模式（供平台选榜）', lb3.mode === 'taiko' && lb3.score === 12345,
+    'mode=' + lb3.mode + ' score=' + lb3.score);
+
   // 输出
   console.log('\n================ 新功能专项自测 ================');
   out.forEach(([k, n, e]) => console.log(`${k === 'PASS' ? '✅' : '❌'} ${n}${e ? '  —  ' + e : ''}`));

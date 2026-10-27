@@ -20,7 +20,13 @@
     LS: 'qc_platform_v2'
   };
 
-  var BOARD = { easy: 1, normal: 2, hard: 3 };
+  /* 排行榜按「模式」分榜：平台最多 5 个榜，音乐×模式×难度无法同时分。
+     节奏=1 / 太鼓=2 / 九宫格=3（预留）/ 连线=4（预留）/ 5 备用
+     难度不再单独占榜，难度最佳分只记本机（见主逻辑的 store）。 */
+  var MODE_BOARD = { classic: 1, taiko: 2, grid9: 3, chain: 4 };
+  var MODE_CN = { classic: '节奏', taiko: '太鼓', grid9: '九宫格', chain: '连线' };
+  var MODE_SOON = { grid9: true, chain: true };
+  var BOARD = MODE_BOARD;
   var DIFF_CN = { easy: '轻松', normal: '心动', hard: '青春' };
 
   var P = window.PLAT = {
@@ -298,7 +304,7 @@
   }
 
   /* ============================================================ 排行榜 */
-  var rankState = { diff: 'normal', period: 'all', loading: false, items: [], mine: null, err: null };
+  var rankState = { mode: 'classic', diff: 'normal', period: 'all', loading: false, items: [], mine: null, err: null };
 
   function buildRankOverlay() {
     if ($('#rankOverlay')) return;
@@ -310,9 +316,10 @@
       + '<div class="sheet-title">排行榜<small>RANKING · 历史最高分</small></div>'
       + '<button class="sheet-close" data-close="rankOverlay">✕</button>'
       + '</div>'
-      + '<div class="tabs" id="rankDiffTabs">'
-      + ['easy', 'normal', 'hard'].map(function (d) {
-        return '<button data-diff="' + d + '" class="' + (d === rankState.diff ? 'on' : '') + '">' + DIFF_CN[d].toUpperCase() + '</button>';
+      + '<div class="tabs" id="rankModeTabs">'
+      + Object.keys(MODE_BOARD).map(function (m) {
+        var soon = MODE_SOON[m] ? ' · 待上线' : '';
+        return '<button data-mode="' + m + '" class="' + (m === rankState.mode ? 'on' : '') + '">' + MODE_CN[m] + soon + '</button>';
       }).join('')
       + '</div>'
       + '<div class="tabs small" id="rankPeriodTabs">'
@@ -327,9 +334,9 @@
     ov.addEventListener('click', function (e) {
       if (e.target === ov || e.target.dataset.close) closeOverlay('rankOverlay');
     });
-    $('#rankDiffTabs').addEventListener('click', function (e) {
-      var b = e.target.closest('button[data-diff]'); if (!b) return;
-      rankState.diff = b.dataset.diff;
+    $('#rankModeTabs').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-mode]'); if (!b) return;
+      rankState.mode = b.dataset.mode;
       [].forEach.call(this.children, function (c) { c.classList.toggle('on', c === b); });
       loadRank();
     });
@@ -353,7 +360,8 @@
   function renderLocalRank(note) {
     var list = $('#rankList');
     if (!list) return;
-    var mine = P.best[rankState.diff] || 0;
+    // 榜单按模式分，所以本机展示取各难度里的最高分
+    var mine = Math.max(P.best.easy || 0, P.best.normal || 0, P.best.hard || 0);
     list.innerHTML = mine > 0
       ? '<div class="rank-row me"><div class="r">1</div>'
         + '<div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#ffd166,#ff9ec7);flex:0 0 auto"></div>'
@@ -369,7 +377,7 @@
     if (!list) return;
     rankState.loading = true;
     list.innerHTML = '<div class="rank-empty">载入中…</div>';
-    var board = BOARD[rankState.diff];
+    var board = MODE_BOARD[rankState.mode] || 1;
 
     /* 没有宿主身份就不要去打扰云端，直接展示本机成绩 */
     if (!P.sdk || !P.user) {
@@ -415,7 +423,7 @@
     } else {
       $('#rankMine').textContent = '—';
     }
-    $('#rankNote').textContent = 'Toy 云端 · ' + DIFF_CN[rankState.diff];
+    $('#rankNote').textContent = 'Toy 云端 · ' + MODE_CN[rankState.mode];
   }
 
   /* ============================================================ 分享 */
@@ -654,12 +662,12 @@
     }
     try {
       P.lastSubmit = Date.now();
-      var r = await TO(P.sdk.submitScore({ board: BOARD[run.diff], score: Math.round(run.score) }), 6000, 'submitScore');
+      var r = await TO(P.sdk.submitScore({ board: MODE_BOARD[run.mode] || 1, score: Math.round(run.score) }), 6000, 'submitScore');
       if (r && typeof r.score === 'number' && r.score > (P.best[run.diff] || 0)) {
         P.best[run.diff] = r.score;
         saveCloud(['best']);
       }
-      var m = await TO(P.sdk.getMyRank({ board: BOARD[run.diff], period: 'all' }), 4000, 'getMyRank').catch(function () { return null; });
+      var m = await TO(P.sdk.getMyRank({ board: MODE_BOARD[run.mode] || 1, period: 'all' }), 4000, 'getMyRank').catch(function () { return null; });
       if (m && m.ranked) {
         var tag = $('#resRankTag');
         if (tag) tag.innerHTML = '全服第 <b>' + m.rank + '</b> 名';
@@ -850,6 +858,9 @@
     var rs = $('#resultScreen');
     if (rs) _mu.observe(rs, { attributes: true, attributeFilter: ['class'] });
   });
+
+  // 暴露给游戏逻辑与自测（平台最多 5 个榜，这里用到 4 个，剩 1 个备用）
+  P.MODE_BOARD = MODE_BOARD; P.MODE_CN = MODE_CN; P.MODE_SOON = MODE_SOON;
 
   window.__PLAT_READY = true;
 })();

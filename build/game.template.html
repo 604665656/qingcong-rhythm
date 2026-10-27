@@ -984,6 +984,8 @@ function openModeInfo(){
   $('#modeHow').innerHTML = m.id==='taiko'
     ? '红色音符=咚（键盘 D / F，或触屏左半屏），蓝色音符=咔（J / K，或触屏右半屏）。音符从右往左流动，进入左侧判定圈时按对应键即得分，命中时哈士喵会敲鼓。长条音符按住为连打。'
     : '音符从上往下落，落到判定线时按对应轨道键（D F J K / 触屏点按 / 手柄）。带箭头的连线音符按住横滑连打，长条音符按住直到条尾。先调好「判定偏移」能让手感更准。';
+  const soon = MODES.filter(m=>m.soon).map(m=>m.name).join('、');
+  if(soon) $('#modeHow').innerHTML += '<div class="note" style="margin-top:8px">即将上线：' + soon + '（排行榜已按模式预留榜位）。</div>';
   $('#modeOverlay').classList.add('on');
 }
 
@@ -1012,8 +1014,12 @@ const DIFFS = [
 /* 玩法模式：下落式（经典四轨） / 太鼓（横向 don-ka） */
 const MODES = [
   {id:'classic', name:'下落',  en:'Falling', hint:'四轨下落 · D F J K'},
-  {id:'taiko',   name:'太鼓',  en:'Taiko',   hint:'咚咔 · 红蓝两键'}
+  {id:'taiko',   name:'太鼓',  en:'Taiko',   hint:'咚咔 · 红蓝两键'},
+  // 预留榜位与入口：九宫格 / 连线（排行榜已按模式预留 3、4 号榜）
+  {id:'grid9',   name:'九宫格', en:'Grid9',  hint:'3×3 九宫格 · 敬请期待', soon:true},
+  {id:'chain',   name:'连线',  en:'Chain',   hint:'音符连线 · 敬请期待', soon:true}
 ];
+const playableModes = ()=> MODES.filter(m=>!m.soon);
 /* 个性化主题：每个主题给出一整套强调色与四轨颜色，applyTheme 写到 CSS 变量与画布。 */
 const THEMES = [
   {id:'qc',    name:'青葱', mint:'#42e8d0', amber:'#ffd166', pink:'#ff9ec7', peach:'#ffb08a', coral:'#ff7a6b', violet:'#a78bfa', blue:'#8ab6ff', lanes:['#42e8d0','#ffd166','#ff9ec7','#8ab6ff'], cat:'#ffd9a0'},
@@ -1033,8 +1039,21 @@ const S = {
 };
 let feverEver = false;    // 本局是否触发过 FEVER（用于成就）
 const store = {
-  get k(){ return 'qc_rhythm_v1_' + S.diff; },
-  best(){ try{ return parseFloat(localStorage.getItem(this.k)||'0')||0; }catch(e){ return 0; } },
+  // 榜单按模式分，本机最佳也按「模式 + 难度」记，避免太鼓分和下落分混在一起
+  get k(){ return 'qc_rhythm_v1_' + (S.mode||'classic') + '_' + S.diff; },
+  get legacy(){ return 'qc_rhythm_v1_' + S.diff; },
+  best(){
+    try{
+      const v = parseFloat(localStorage.getItem(this.k)||'0')||0;
+      if(v) return v;
+      // 旧档只按难度存过，迁移给 classic，避免老玩家最佳分清零
+      if((S.mode||'classic')==='classic'){
+        const old = parseFloat(localStorage.getItem(this.legacy)||'0')||0;
+        if(old){ localStorage.setItem(this.k, String(old)); return old; }
+      }
+      return 0;
+    }catch(e){ return 0; }
+  },
   set(v){ try{ if(v>this.best()) localStorage.setItem(this.k, String(v)); }catch(e){} }
 };
 
@@ -2224,7 +2243,8 @@ function finish(){
   if(typeof window.__onFinish === 'function'){
     try{
       window.__onFinish({
-        diff: S.diff, score: S.score, acc: acc, notes: total,
+        diff: S.diff, mode: S.mode, song: (SONG && SONG.id) || 0,
+        score: S.score, acc: acc, notes: total,
         judge: {PERFECT:S.judge.PERFECT, GREAT:S.judge.GREAT, GOOD:S.judge.GOOD, MISS:S.judge.MISS},
         maxCombo: S.maxCombo, dur: Math.max(0, S.t || 0)
       });
@@ -2488,7 +2508,14 @@ function bindSettings(){
   };
   bindPanelClose();
   applyOrient();
-  $('#modesBtn').onclick = ()=>{ const i=MODES.findIndex(m=>m.id===S.mode); S.mode=MODES[(i+1)%MODES.length].id; applyMode(); openModeInfo(); };
+  // 只在已实现的模式间循环（九宫格 / 连线是预留入口，选中会提示敬请期待）
+  $('#modesBtn').onclick = ()=>{
+    const list = playableModes();
+    const i = list.findIndex(m=>m.id===S.mode);
+    const next = list[((i<0?0:i)+1) % list.length];
+    if(MODES.find(m=>m.id===next.id).soon){ toast(next.name + ' 敬请期待'); return; }
+    S.mode = next.id; applyMode(); openModeInfo();
+  };
   $('#modeClose').onclick = ()=>{ $('#modeOverlay').classList.remove('on'); if(S.screen==='game' && S.paused && S.modePaused) resume(); };
   const sfxRange2=$('#sfxRange2');
   if(sfxRange2) sfxRange2.oninput = ()=>{ S.sfxVol=+sfxRange2.value/100; Sfx.setVol(S.sfxVol); const sr=$('#sfxRange'); if(sr) sr.value=sfxRange2.value; const sv=$('#sfxVal'); if(sv) sv.textContent=sfxRange2.value+'%'; };
