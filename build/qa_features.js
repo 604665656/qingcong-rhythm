@@ -312,18 +312,19 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   T('退出能还原未保存的修改', sv.back === true, 'back=' + sv.back);
 
   /* ---- 8. 横竖屏切换 / 面板关闭 ---- */
-  const oc1 = await ev(`(function(){
+  // setOrient 现在是 async（要先 await SDK 容器能力），测试必须等它 resolve
+  const oc1 = await ev(`(async function(){
     try{
       var ob = document.getElementById('orientBtn');
       var hasBtn = !!ob;
-      setOrient('landscape');
-      var l1 = document.body.classList.contains('rot90'), t1 = ob? ob.textContent : '';
-      setOrient('portrait');
-      var l2 = document.body.classList.contains('rot90'), t2 = ob? ob.textContent : '';
-      setOrient('auto');
+      await setOrient('landscape');
+      var l1 = document.body.classList.contains('rot90');
+      await setOrient('portrait');
+      var l2 = document.body.classList.contains('rot90');
+      await setOrient('auto');
       var t3 = ob? ob.textContent : '';
       var l3 = document.body.classList.contains('rot90');
-      return JSON.stringify({hasBtn:hasBtn, l1:l1, t1:t1, l2:l2, t2:t2, t3:t3, l3:l3,
+      return JSON.stringify({hasBtn:hasBtn, l1:l1, l2:l2, t3:t3, l3:l3,
         wide: window.innerWidth > window.innerHeight});
     }catch(e){ return 'ERR:'+e.message; }
   })()`);
@@ -332,6 +333,27 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   T('强制横屏在竖屏视口下旋转画面', oc.wide ? true : oc.l1 === true, 'wide=' + oc.wide + ' rot90=' + oc.l1);
   T('强制竖屏在横屏视口下旋转画面', oc.wide ? oc.l2 === true : true, 'wide=' + oc.wide + ' rot90=' + oc.l2);
   T('切回自动不残留旋转', oc.l3 === false, 'rot90=' + oc.l3);
+
+  // 关键：容器接管后不能再叠加 CSS 旋转，否则画面会被转两次
+  const sd1 = await ev(`(async function(){
+    try{
+      var P = window.PLAT; if(!P) return JSON.stringify({noPlat:true});
+      var real = P.sdk;
+      var calls = [];
+      P.sdk = { setContainerMode: function(o){ calls.push(o); return Promise.resolve({}); } };
+      await setOrient('landscape');
+      var rotWithSdk = document.body.classList.contains('rot90');
+      var last = calls.length ? calls[calls.length-1] : null;
+      P.sdk = real;                                  // 还原
+      await setOrient('auto');
+      return JSON.stringify({noPlat:false, called:calls.length,
+        orientation: last? last.orientation : '', rotWithSdk:rotWithSdk});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const sd = J(sd1, 'sd');
+  T('在 Toy 容器里走官方 setContainerMode', sd.called >= 1 && sd.orientation === 'landscape',
+    'called=' + sd.called + ' orientation=' + sd.orientation);
+  T('容器接管后不叠加 CSS 旋转（防转两次）', sd.rotWithSdk === false, 'rot90=' + sd.rotWithSdk);
 
   const cl1 = await ev(`(function(){
     try{

@@ -2416,23 +2416,60 @@ function syncOptsUI(){
 /* 用 CSS 旋转整个 app 实现，任何环境（本地 / 网页 / Toy webview）都确定生效。
    官方 SDK 另有 setContainerMode（B站 App 9.9.0+）可切容器横竖屏，
    但其入参形状需以 SDK 文档为准（需登录查看），确认后再接，避免猜错导致画面被转两次。 */
-function applyOrient(){
+let orientBySdk = false;      // 是否已由 SDK 容器接管（接管后不能再叠加 CSS 旋转）
+function applyOrient(skipCss){
   const b = document.body;
   b.classList.remove('rot90');
   const o = S.orient || 'auto';
-  const wide = window.innerWidth > window.innerHeight;
-  if(o==='landscape' && !wide) b.classList.add('rot90');
-  else if(o==='portrait' && wide) b.classList.add('rot90');
+  if(!skipCss){
+    const wide = window.innerWidth > window.innerHeight;
+    if(o==='landscape' && !wide) b.classList.add('rot90');
+    else if(o==='portrait' && wide) b.classList.add('rot90');
+  }
   const ob = $('#orientBtn');
   if(ob) ob.textContent = o==='auto' ? '屏幕：自动' : (o==='landscape' ? '屏幕：横屏' : '屏幕：竖屏');
   if(typeof resize === 'function') setTimeout(resize, 80);
 }
-function setOrient(v){
-  S.orient = v; saveCustom(); applyOrient();
-  toast(v==='auto' ? '跟随设备方向' : (v==='landscape' ? '已强制横屏' : '已强制竖屏'));
+async function setOrient(v){
+  S.orient = v; saveCustom();
+  let bySdk = false;
+  try{
+    const P = window.PLAT;
+    // 官方容器能力：orientation 取 'portrait' | 'landscape' | 'auto'
+    if(P && P.sdk && typeof P.sdk.setContainerMode === 'function'){
+      await P.sdk.setContainerMode({ orientation: v });
+      bySdk = true;                       // 容器自己会转，别再 CSS 转一次
+    }
+  }catch(e){ bySdk = false; }             // web 实现抛 unsupported → 走 CSS 兜底
+  orientBySdk = bySdk;
+  applyOrient(bySdk);
+  toast((v==='auto' ? '跟随设备方向' : (v==='landscape' ? '已强制横屏' : '已强制竖屏'))
+        + (bySdk ? '' : '（本机预览用旋转模拟）'));
 }
-window.addEventListener('orientationchange', ()=> setTimeout(applyOrient, 260));
-window.addEventListener('resize', ()=> { if(S.orient && S.orient!=='auto') applyOrient(); });
+/* 容器状态：读安全区并监听旋转 / 沉浸变化（安全区写入 CSS 变量备用） */
+function bindContainer(){
+  try{
+    const P = window.PLAT;
+    if(!P || !P.sdk) return;
+    const applySafe = st=>{
+      const sa = (st && st.safeArea) || {};
+      const r = document.documentElement.style;
+      ['top','right','bottom','left'].forEach(k=>{
+        if(typeof sa[k] === 'number') r.setProperty('--safe-' + k, sa[k] + 'px');
+      });
+    };
+    if(typeof P.sdk.getContainerState === 'function'){
+      P.sdk.getContainerState().then(st=>{ applySafe(st); }).catch(()=>{});
+    }
+    if(typeof P.sdk.onContainerChange === 'function'){
+      P.sdk.onContainerChange(st=>{
+        try{ applySafe(st); if(S.orient && S.orient!=='auto') applyOrient(orientBySdk); }catch(e){}
+      });
+    }
+  }catch(e){}   // web 下 onContainerChange 直接抛 unsupported
+}
+window.addEventListener('orientationchange', ()=> setTimeout(()=>applyOrient(orientBySdk), 260));
+window.addEventListener('resize', ()=> { if(S.orient && S.orient!=='auto') applyOrient(orientBySdk); });
 
 /* ---------- 面板关闭：右上角 ✕ / 点背景 / Esc ---------- */
 /* 装扮页内容很长，底部「保存/退出」要滚动才够得着，所以必须有多条关闭路径。 */
@@ -2585,6 +2622,7 @@ function proceed(){
   applyTheme();
   renderCat();
   applyMy(); applyUpCard(); syncOptsUI(); applyOrient();
+  bindContainer(); setTimeout(bindContainer, 1200);   // SDK 是异步加载的，稍后重试一次
   $('#songTitleH1').innerHTML = ((SONG.title||'')).replace(' ', '<br/>') || '嘶恍而过的<br/>青葱岁月';
   $('#composerLbl').textContent = SONG.meta.composer || '—';
   $('#lyricistLbl').textContent = SONG.meta.lyricist || '—';

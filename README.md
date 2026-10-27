@@ -96,8 +96,17 @@
 | **本地存储易丢失，重要数据用云存档** | 最佳分同时写本机与云存档 |
 | **`api.bilibili.com` 未开放 CORS** | 浏览器直连取不到用户信息/头像 → UP 主头像随包内置（data URI ~3KB），联网再尝试刷新 |
 
-另：官方 SDK 另有 `setContainerMode` 可切容器横竖屏（B站 App 9.9.0+），
-但入参形状需登录 SDK 文档确认，本项目暂用 CSS 旋转实现（任何环境都确定生效），确认后再接。
+**横竖屏（已接官方能力）**
+- 优先 `sdk.setContainerMode({ orientation })`，取值 `portrait` / `landscape` / `auto`
+- 容器接管后**不再叠加 CSS 旋转**（否则会转两次）；容器不支持时（web / 旧版 App，
+  SDK web 实现会抛 `unsupported`）回退到 CSS 旋转 `#app`
+- 监听 `sdk.onContainerChange`，安全区写入 `--safe-top/right/bottom/left` CSS 变量
+- `sdk.getContainerState()` 返回 `{deviceType, viewport, orientation, immersive, safeArea, changedFields}`
+- `sdk.getUserProfile()` 返回 `{avatar, nickname, toyOpenId}`
+
+**备注**：SDK 另有 `checkInputSafety({text, scene})` 可做文本内容安全校验。
+若将来想放开弹幕自由输入，需先接这个接口——但 FAQ 四、10 仍写着「绝对禁止提供 UGC 能力」，
+且四、5 说明即便接入也「仍需以平台审核结论为准」，所以当前**默认保持预置短语点选**以求稳过审。
 
 **其它**
 - 老板键：`Alt + X` / `` ` ``，手机上三指长按 500ms；伪装成 Excel 工作排期表
