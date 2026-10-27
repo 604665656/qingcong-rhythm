@@ -35,10 +35,14 @@ def main():
 
     chart_json = json.dumps(chart_raw, ensure_ascii=False, separators=(",", ":"))
 
+    # 元数据取第一首（当前只有一首；多歌曲时每首自带 meta）
+    song0 = chart_raw["songs"][0] if chart_raw.get("songs") else chart_raw
+    meta0 = song0.get("meta", {})
+
     # ---------- 1) 单文件版 ----------
     single = render(tpl, chart_json, plat_css, plat_js, "data:audio/mpeg;base64," + b64)
-    single = (single.replace("__COMPOSER__", chart_raw["meta"].get("composer", ""))
-                    .replace("__LYRICIST__", chart_raw["meta"].get("lyricist", "")))
+    single = (single.replace("__COMPOSER__", meta0.get("composer", ""))
+                    .replace("__LYRICIST__", meta0.get("lyricist", "")))
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(single)
     print("OK  单文件  %s  %.2f MB" % (OUT, os.path.getsize(OUT) / 1024 / 1024))
@@ -52,8 +56,8 @@ def main():
         if os.path.exists(p):
             os.remove(p)
     split = render(tpl, chart_json, plat_css, plat_js, "song.mp3")
-    split = (split.replace("__COMPOSER__", chart_raw["meta"].get("composer", ""))
-                  .replace("__LYRICIST__", chart_raw["meta"].get("lyricist", "")))
+    split = (split.replace("__COMPOSER__", meta0.get("composer", ""))
+                  .replace("__LYRICIST__", meta0.get("lyricist", "")))
     with open(os.path.join(DIST, "index.html"), "w", encoding="utf-8") as f:
         f.write(split)
     shutil.copyfile(mp3, os.path.join(DIST, "song.mp3"))

@@ -51,7 +51,7 @@
   .glass{background:linear-gradient(160deg, rgba(38,28,58,.72), rgba(16,12,28,.78));border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px);}
   .btn{
     position:relative;border:0;cursor:pointer;font-family:var(--font);font-weight:700;letter-spacing:.06em;color:#1a0f18;
-    background:linear-gradient(135deg,#ffd166,#ff9ec7 55%,#a78bfa);
+    background:linear-gradient(135deg,var(--amber),var(--pink) 55%,var(--violet));
     padding:16px 40px;border-radius:999px;font-size:17px;
     box-shadow:0 10px 30px rgba(255,140,170,.3), inset 0 1px 0 rgba(255,255,255,.6);
     transition:transform .16s cubic-bezier(.2,.9,.3,1.4), box-shadow .2s, filter .2s;
@@ -119,6 +119,22 @@
   .diff .cnt{position:absolute;right:12px;top:14px;font-size:9.5px;color:var(--txt-dim);letter-spacing:.04em;white-space:nowrap;opacity:.85;}
   .title-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
   .best{font-size:12px;color:var(--txt-dim);letter-spacing:.06em;}
+  /* 选曲条 */
+  .songs{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .song{cursor:pointer;padding:8px 16px;border-radius:999px;font-size:13px;font-weight:600;letter-spacing:.04em;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);transition:.2s;white-space:nowrap;}
+  .song:hover{border-color:rgba(255,255,255,.3);}
+  .song.sel{background:linear-gradient(135deg, rgba(255,209,102,.22), rgba(255,158,199,.16));border-color:rgba(255,209,102,.7);color:#fff;}
+  /* 装扮弹层 */
+  .dress-section{margin:14px 0;}
+  .dress-section>label{display:block;font-size:12px;color:var(--txt-dim);letter-spacing:.06em;margin-bottom:9px;}
+  .themes{display:flex;gap:12px;}
+  .theme{width:42px;height:42px;border-radius:12px;cursor:pointer;border:2px solid rgba(255,255,255,.18);transition:.2s;}
+  .theme:hover{transform:translateY(-2px);}
+  .theme.sel{border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.25),0 8px 18px rgba(0,0,0,.35);}
+  .nick-input{width:100%;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);
+    color:var(--txt);font-size:14px;font-family:var(--font);outline:none;}
+  .nick-input:focus{border-color:var(--amber);}
   .best b{color:var(--amber);font-variant-numeric:tabular-nums;font-size:14px;}
   .title-art{position:relative;width:clamp(210px,26vw,330px);display:flex;justify-content:center;}
   .title-art .halo{position:absolute;inset:-6% -10%;background:radial-gradient(50% 50% at 50% 46%, rgba(255,209,102,.30), rgba(255,158,199,.14) 44%, transparent 70%);filter:blur(6px);}
@@ -169,8 +185,8 @@
   #judgeText{position:absolute;left:50%;top:calc(100% - 26vh);transform:translate(-50%,0);font-size:clamp(20px,3vw,28px);font-weight:900;letter-spacing:.14em;opacity:0;pointer-events:none;}
   #judgeText.show{animation:jtext .5s ease-out forwards;}
   @keyframes jtext{0%{opacity:0;transform:translate(-50%,8px) scale(.86);}18%{opacity:1;transform:translate(-50%,0) scale(1.06);}70%{opacity:1;transform:translate(-50%,-6px) scale(1);}100%{opacity:0;transform:translate(-50%,-16px) scale(.98);}}
-  .j-PERFECT{color:#ffe6a8;text-shadow:0 0 26px rgba(255,209,102,.9),0 0 60px rgba(255,158,199,.5);}
-  .j-GREAT{color:#9ff2dd;text-shadow:0 0 22px rgba(126,232,208,.8);}
+  .j-PERFECT{color:var(--amber);text-shadow:0 0 26px rgba(255,209,102,.9),0 0 60px rgba(255,158,199,.5);}
+  .j-GREAT{color:var(--mint);text-shadow:0 0 22px rgba(126,232,208,.8);}
   .j-GOOD{color:#a9c6ff;text-shadow:0 0 18px rgba(138,182,255,.7);}
   .j-MISS{color:#ff8b9a;text-shadow:0 0 18px rgba(255,110,140,.8);}
   .j-HOLD{color:#8ff5e2;text-shadow:0 0 20px rgba(66,232,208,.85);font-size:.82em;letter-spacing:.06em;}
@@ -374,17 +390,21 @@ __PLATFORM_CSS__
     <div class="title-wrap">
       <div>
         <div class="kicker"><i></i>Rhythm · 青葱岁月</div>
-        <h1>嘶恍而过的<br/>青葱岁月</h1>
+        <h1 id="songTitleH1">嘶恍而过的<br/>青葱岁月</h1>
         <div class="sub">哈士猫 · 音乐节奏游戏</div>
         <div class="meta-row">
-          <span>作曲 <b>__COMPOSER__</b></span>
-          <span>作词 <b>__LYRICIST__</b></span>
+          <span>作曲 <b id="composerLbl">__COMPOSER__</b></span>
+          <span>作词 <b id="lyricistLbl">__LYRICIST__</b></span>
+          <span>来源 <b id="srcLbl">汽水音乐</b></span>
           <span>BPM <b id="bpmLbl">--</b></span>
           <span>时长 <b id="durLbl">--:--</b></span>
         </div>
+        <div class="songs" id="songs"></div>
         <div class="diffs" id="diffs"></div>
         <div class="title-actions">
           <button class="btn" id="startBtn">开始游戏</button>
+          <button class="btn ghost" id="modesBtn">模式：下落</button>
+          <button class="btn ghost" id="dressBtn">装扮</button>
           <button class="btn ghost" id="settingBtn">设置</button>
           <button class="btn ghost" id="helpBtn">玩法</button>
           <div class="best">最佳 <b id="bestLbl">—</b></div>
@@ -406,7 +426,7 @@ __PLATFORM_CSS__
     <canvas id="playfield"></canvas>
     <div class="hud-top">
       <div class="song-id">
-        <div class="t">嘶恍而过的青葱岁月</div>
+        <div class="t" id="gSongTitle">嘶恍而过的青葱岁月</div>
         <div class="s" id="diffTag">NORMAL</div>
         <div class="prog"><i id="progBar"></i></div>
       </div>
@@ -481,6 +501,9 @@ __PLATFORM_CSS__
       <div class="row"><label><input type="range" id="spdRange" min="0.6" max="1.8" step="0.05" value="1" /></label><span style="font-size:10.5px;color:var(--txt-dim)">越大越快</span></div>
       <div class="row"><label>音量</label><span class="val" id="volVal">80%</span></div>
       <div class="row"><label><input type="range" id="volRange" min="0" max="100" step="1" value="80" /></label><span style="font-size:10.5px;color:var(--txt-dim)">音乐</span></div>
+      <div class="row"><label>判定音</label><span class="val" id="sfxVal">50%</span></div>
+      <div class="row"><label><input type="range" id="sfxRange" min="0" max="100" step="1" value="50" /></label><span style="font-size:10.5px;color:var(--txt-dim)">贴合歌曲调性，MISS 不出声</span></div>
+      <div class="row"><label>判定音开关</label><div class="switch on" id="sfxSw"></div></div>
       <div class="row"><label>自动演示</label><div class="switch" id="autoSw"></div></div>
       <div class="panel-actions"><button class="btn ghost" id="settingClose" style="flex:1">完成</button></div>
     </div>
@@ -490,15 +513,32 @@ __PLATFORM_CSS__
     <div class="panel glass">
       <h3>玩法</h3>
       <div class="row"><label>键盘</label><span><span class="kbd">D</span> <span class="kbd">F</span> <span class="kbd">J</span> <span class="kbd">K</span></span></div>
+      <div class="row"><label>太鼓模式</label><span>红=咚（D F）、蓝=咔（J K）；触屏左半咚、右半咔，长按为连打</span></div>
       <div class="row"><label>手机 / 触屏</label><span>点按轨道下方，按住横向滑可连打</span></div>
       <div class="row"><label>手柄</label><span>A B X Y / 十字键，Start 暂停</span></div>
       <div class="row"><label>长条音符</label><span>按住直到条尾，按满有收尾判定</span></div>
       <div class="row"><label>滑条</label><span>带箭头连线的音符，按住横向滑过去</span></div>
-      <div class="row"><label>判定</label><span>PERFECT ±70ms / GREAT ±110ms，点偏一格也能接住</span></div>
+      <div class="row"><label>判定</label><span>PERFECT ±85ms / GREAT ±140ms / GOOD ±200ms，点偏一格也能接住</span></div>
+      <div class="row"><label>判定偏移</label><span>若总觉得「早了/晚了」，到设置里调偏移（晚按调正、早按调负）</span></div>
       <div class="row"><label>FEVER</label><span>50 连击进入 ×1.5 加成</span></div>
       <div class="row"><label>暂停</label><span><span class="kbd">Esc</span> / 右下角按钮</span></div>
       <div class="help-health">抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。<br/>适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。</div>
       <div class="panel-actions"><button class="btn ghost" id="helpClose" style="flex:1">知道了</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="dressOverlay">
+    <div class="panel glass">
+      <h3>装扮 · 个性化</h3>
+      <div class="dress-section"><label>主题配色</label><div class="themes" id="themes"></div></div>
+      <div class="dress-section"><label>玩家昵称</label>
+        <input class="nick-input" id="nickInput" maxlength="12" placeholder="给自己起个名字" />
+      </div>
+      <div class="dress-section"><label>判定音</label>
+        <div class="row"><input type="range" id="sfxRange2" min="0" max="100" step="1" value="50" /></div>
+        <div class="row"><label style="font-size:12px;color:var(--txt-dim)">贴合歌曲调性合成，MISS 不出声</label></div>
+      </div>
+      <div class="panel-actions"><button class="btn ghost" id="dressClose" style="flex:1">完成</button></div>
     </div>
   </div>
 
@@ -514,9 +554,13 @@ __PLATFORM_CSS__
    嘶恍而过的青葱岁月 · Web 音游
    原创实现：谱面由音频起始点分析离线生成
    ============================================================ */
-const SONG = __SONG_DATA__;
-/* 音轨地址：单文件版是 data: URI，分包版是相对路径 song.mp3 */
-const AUDIO_SRC = "__AUDIO__";
+const SONG_DATA = __SONG_DATA__;
+/* 多歌曲框架：SONGS 是所有可选曲目，SONG 是当前选中的那一首。
+   后续加歌只需在 SONG_DATA.songs 里再加一项（audio 填相对路径 / 单文件版填 data URI）。 */
+const SONGS = (SONG_DATA && SONG_DATA.songs) ? SONG_DATA.songs : [SONG_DATA];
+let SONG = SONGS[0];
+/* 音轨地址：单文件版是 data: URI，分包版是相对路径（每条歌曲自带 audio 字段） */
+let AUDIO_SRC = (SONG && SONG.audio) ? SONG.audio : "song.mp3";
 
 /* 移动端没有控制台，把运行错误直接印到加载页，避免"卡住但没提示" */
 window.addEventListener('error', function(e){
@@ -635,12 +679,18 @@ const CAT_SVG = `
 /* ---------- 常量 ---------- */
 const LANES = 4;
 const KEYMAP = {KeyD:0, KeyF:1, KeyJ:2, KeyK:3, ArrowLeft:0, ArrowDown:1, ArrowUp:2, ArrowRight:3};
-const LANE_COLORS = ['#42e8d0','#ffd166','#ff9ec7','#8ab6ff'];
+let LANE_COLORS = ['#42e8d0','#ffd166','#ff9ec7','#8ab6ff'];
 const LANE_KEYS = ['D','F','J','K'];
-const WIN = {PERFECT:0.070, GREAT:0.110, GOOD:0.155, MISS:0.200};
+/* 判定窗口（半宽，单位秒）。
+   参照多款开源/主流音游标定，手机触屏整体比键盘宽松：
+     Phigros  PERFECT ±80  GOOD ±150  Bad ±180
+     StepMania PERFECT ±45  GREAT ±90  GOOD ±135
+     DDR       PERFECT ±33  GREAT ±92  GOOD ±142
+   这里比 Phigros 再松一档，休闲向、对触屏友好；GOOD 也保留连击（不打断）。 */
+const WIN = {PERFECT:0.085, GREAT:0.140, GOOD:0.200, MISS:0.280};
 /* 跨轨宽容：手机触屏手指比音符宽，点偏一格很常见。
    本轨没够到音符时，允许相邻轨在更紧的窗口内接手，避免「明明按了却不给分」。 */
-const LANE_ASSIST = 0.078;
+const LANE_ASSIST = 0.10;
 const SCORE_VAL = {PERFECT:1000, GREAT:700, GOOD:350, MISS:0};
 const ACC_VAL = {PERFECT:1, GREAT:0.75, GOOD:0.4, MISS:0};
 const DIFFS = [
@@ -648,11 +698,24 @@ const DIFFS = [
   {id:'normal', name:'NORMAL', cn:'心动', stars:'★★★☆', color:'#ffd166'},
   {id:'hard',   name:'HARD',   cn:'青春', stars:'★★★★★', color:'#ff9ec7'}
 ];
+/* 玩法模式：下落式（经典四轨） / 太鼓（横向 don-ka） */
+const MODES = [
+  {id:'classic', name:'下落',  en:'Falling', hint:'四轨下落 · D F J K'},
+  {id:'taiko',   name:'太鼓',  en:'Taiko',   hint:'咚咔 · 红蓝两键'}
+];
+/* 个性化主题：每个主题给出一整套强调色与四轨颜色，applyTheme 写到 CSS 变量与画布。 */
+const THEMES = [
+  {id:'qc',    name:'青葱', mint:'#42e8d0', amber:'#ffd166', pink:'#ff9ec7', peach:'#ffb08a', coral:'#ff7a6b', violet:'#a78bfa', blue:'#8ab6ff', lanes:['#42e8d0','#ffd166','#ff9ec7','#8ab6ff'], cat:'#ffd9a0'},
+  {id:'sakura',name:'樱粉', mint:'#ffd1e0', amber:'#ffb6cf', pink:'#ff8fb1', peach:'#ffc6dd', coral:'#ff7ea8', violet:'#b98cff', blue:'#a0c8ff', lanes:['#ff8fb1','#ffd1e0','#ff7ea8','#b98cff'], cat:'#ffd9e8'},
+  {id:'dusk',  name:'暮蓝', mint:'#9fe8ff', amber:'#ffd166', pink:'#7aa8ff', peach:'#9fb8ff', coral:'#6f8bff', violet:'#8f7bff', blue:'#7ec8ff', lanes:['#7aa8ff','#9fe8ff','#7ec8ff','#a0a8ff'], cat:'#cfe0ff'},
+  {id:'cat',   name:'猫橙', mint:'#ffb061', amber:'#ffd9a0', pink:'#ff7e7e', peach:'#ffc59a', coral:'#ff9a5a', violet:'#ffb0d0', blue:'#ffcf8f', lanes:['#ffb061','#ffd9a0','#ff7e7e','#ffcf8f'], cat:'#ffd9a0'}
+];
 
 /* ---------- 状态 ---------- */
 const S = {
   diff: 'normal', screen:'title', playing:false, paused:false, auto:false,
-  offset: 0, speed: 1, vol: 0.8,
+  mode: 'classic', songIdx: 0, theme: 'qc', nick: '',
+  offset: 0, speed: 1, vol: 0.8, sfxVol: 0.5, sfxOn: true,
   chart: [], slides: [], notes: [], beats: [], lyrics: [],
   judge: {PERFECT:0, GREAT:0, GOOD:0, MISS:0}, combo:0, maxCombo:0, score:0, accSum:0, accCount:0,
   fever:false, t:0, startT:0, dur: SONG.meta.duration
@@ -752,6 +815,7 @@ async function loadAudio(){
       const buf = await decodeAny(actx, bytes.slice(0), 20000);
       if(!buf || !buf.duration || !isFinite(buf.duration)) throw new Error('解码结果无效');
       abuf = buf; audioMode = 'webaudio'; S.dur = buf.duration;
+      Sfx.init(buf); Sfx.setVol(S.sfxVol); Sfx.setEnabled(S.sfxOn);
       return;
     }catch(err){
       console.warn('[audio] WebAudio 路径不可用：', (err && (err.message||err)) || err);
@@ -763,6 +827,7 @@ async function loadAudio(){
   /* ---------- 路径 2：<audio> 元素 + Blob URL（iOS 上远比 data: URI 稳） ---------- */
   say('切换到播放器模式…');
   audioMode = 'element'; S.dur = SONG.meta.duration;
+  Sfx.init(null); Sfx.setVol(S.sfxVol); Sfx.setEnabled(S.sfxOn);
   try{
     audioEl = document.createElement('audio');
     audioEl.setAttribute('playsinline','');
@@ -840,8 +905,95 @@ function unlockAudio(){
       const p = audioEl.play();
       if(p && p.catch) p.catch(()=>{});
     }
+    Sfx.resume();
   }catch(e){}
 }
+
+/* ---------- 判定音效（贴合歌曲调性，不喧宾夺主） ----------
+   用 WebAudio 合成轻量音符，而非塞一段现成音效。
+   先对音轨做基频估计，取歌曲调内「五声音阶」，判定音就落在歌曲音阶里，
+   所以无论怎么打，声音都和伴奏是同一调，不会违和。
+   MISS 不出声（避免刺耳）；整体音量压到音乐之下。 */
+const Sfx = (function(){
+  let ac=null, master=null;
+  // 默认 C 大调五声（detectTonic 会用真实歌曲覆盖）
+  let scale=[261.63,293.66,329.63,392.00,440.00,523.25];
+  let enabled=true, vol=0.5;
+  function ensure(){
+    if(ac) return ac;
+    if(typeof actx!=='undefined' && actx && actx.state!=='closed'){
+      ac = actx; master = ac.createGain(); master.gain.value = vol; master.connect(ac.destination);
+    }else{
+      try{
+        const AC = window.AudioContext || window.webkitAudioContext;
+        ac = new AC({latencyHint:'interactive'}); master = ac.createGain(); master.gain.value = vol; master.connect(ac.destination);
+      }catch(e){ ac=null; }
+    }
+    return ac;
+  }
+  function resume(){ if(ac && ac.state==='suspended') ac.resume(); }
+  // 基频估计：降采样后自相关，找 80~400Hz 最强周期 → 吸附到最近半音 → 大调五声
+  function detectTonic(buf){
+    try{
+      const ch = buf.getChannelData(0), sr = buf.sampleRate;
+      const N = Math.min(sr*3, ch.length);
+      const targetSR = 11025, step = Math.max(1, Math.floor(sr/targetSR));
+      const m = []; for(let i=0;i<N;i+=step) m.push(ch[i]);
+      const Mn = m.length, minLag = Math.floor(targetSR/400), maxLag = Math.floor(targetSR/80);
+      let bestLag=0, bestCorr=-1e18;
+      for(let lag=minLag; lag<=maxLag; lag++){
+        let c=0; for(let i=0;i<Mn-lag;i+=2) c += m[i]*m[i+lag];
+        if(c>bestCorr){ bestCorr=c; bestLag=lag; }
+      }
+      if(!bestLag) return;
+      const f0 = targetSR/bestLag;
+      const midi = Math.round(69 + 12*Math.log2(f0/440));
+      const base = 440*Math.pow(2,(midi-69)/12);
+      scale = [base, base*Math.pow(2,2/12), base*Math.pow(2,4/12), base*Math.pow(2,7/12), base*Math.pow(2,9/12), base*2];
+    }catch(e){}
+  }
+  function init(buf){ if(buf && buf.sampleRate) detectTonic(buf); ensure(); resume(); }
+  // 单个柔和音符：三角波 + 快衰减，频段压在音乐之下
+  function tone(freq, dur, peak, type){
+    const a = ensure(); if(!a) return;
+    const t = a.currentTime;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type||'triangle'; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t+0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.disconnect; o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.02);
+  }
+  function judge(j){
+    if(!enabled) return;
+    if(j==='PERFECT') tone(scale[5], 0.16, 0.22, 'triangle');     // 高八度，明亮
+    else if(j==='GREAT') tone(scale[3], 0.15, 0.17, 'triangle');    // 纯五度
+    else if(j==='GOOD') tone(scale[0], 0.14, 0.12, 'sine');         // 根音，最轻
+    // MISS 不出声
+  }
+  // 太鼓：don=鼓面（低膜）、ka=鼓边（高亮），本身是打击乐，和节奏天然契合
+  function don(){
+    if(!enabled) return;
+    const a = ensure(); if(!a) return;
+    const t=a.currentTime;
+    const o=a.createOscillator(), g=a.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(220,t); o.frequency.exponentialRampToValueAtTime(118,t+0.09);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.34,t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+0.13);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t+0.16);
+  }
+  function ka(){
+    if(!enabled) return;
+    const a = ensure(); if(!a) return;
+    const t=a.currentTime;
+    const o=a.createOscillator(), g=a.createGain();
+    o.type='triangle'; o.frequency.setValueAtTime(520,t); o.frequency.exponentialRampToValueAtTime(360,t+0.05);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.20,t+0.003); g.gain.exponentialRampToValueAtTime(0.0001,t+0.08);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t+0.1);
+  }
+  function setEnabled(v){ enabled=v; if(v) resume(); }
+  function setVol(v){ vol=v; if(master) master.gain.value=v; }
+  return {init, judge, don, ka, setEnabled, setVol, resume, ensure};
+})();
 
 /* ---------- 画布尺寸 ---------- */
 const V = {w:0,h:0,dpr:1,laneX:0,laneW:0,judgeY:0,topY:0,portrait:false};
@@ -888,6 +1040,21 @@ function chartFor(id){
 }
 const approach = () => 1.55 / S.speed;
 
+/* ---------- 太鼓谱面（由四轨谱自动派生） ----------
+   下落式四轨的 lane 是按频段排的：低音 0/1、高音 2/3。
+   映射到太鼓更自然：低音 → 咚（鼓面，红），高音 → 咔（鼓边，蓝）。
+   这样同一段音频分析就能同时玩两种模式，不用单独做谱。 */
+function taikoFor(id){
+  const raw = SONG.charts[id] || [];
+  return raw.map(n=>{
+    const don = (n[1] <= 1);                 // lane 0/1 → 咚，2/3 → 咔
+    return {t:n[0], type: don?'don':'ka', hold:n[2]||0, hit:false, missed:false,
+            judged:false, holding:false, done:false, holdTick:0};
+  }).sort((a,b)=>a.t-b.t);
+}
+/* 太鼓判定窗口（参照开源太鼓次郎：新手 良 ±80ms；这里略放宽） */
+const TAIKO_WIN = {GOOD:0.085, OK:0.150, MISS:0.220};
+
 /* ---------- 连线滑条 ----------
    相邻轨快速连续的几个音符视为一条「下滑音轨」，用光带连起来，
    玩家按住横向滑过去即可（触屏换轨续打已经支持）。
@@ -911,8 +1078,9 @@ function buildSlides(list){
   for(const ch of chains){
     for(let i=0;i<ch.length;i++){
       ch[i].slide = true;
+      // 箭头只指向下一个音符；链尾没有下一个，不画箭头（避免指向空白）
       if(i+1 < ch.length) ch[i].slideDir = Math.sign(ch[i+1].lane - ch[i].lane);
-      else ch[i].slideDir = ch.length>1 ? Math.sign(ch[i].lane - ch[i-1].lane) : 0;
+      else ch[i].slideDir = 0;
     }
   }
   return chains;
@@ -981,6 +1149,105 @@ function judge(lane, ts){
   if(best.hold){ best.holdStart = now; best.holdNeed = best.hold; best.holdTick = 0; }
   registerHit(best, j, best.lane);
 }
+
+/* ---------- 太鼓判定 ----------
+   咚（红/鼓面）= lane 0/1，咔（蓝/鼓边）= lane 2/3。
+   同类型里挑最近的未命中音符；窗口参照开源太鼓次郎（新手 良 ±80ms，这里略放宽）。
+   命中即敲鼓（don/ka 合成鼓声，和旋律无关，天然不违和）；MISS/偏太远不出鼓声。 */
+function judgeTaiko(type, ts){
+  if(S.auto) return;
+  const now = ts;
+  let best=null, bestAbs=1e9;
+  for(const n of S.chart){
+    if(n.hit || n.type!==type) continue;
+    const d = Math.abs(n.t - now);
+    if(d < bestAbs && d <= TAIKO_WIN.MISS){ best=n; bestAbs=d; }
+  }
+  if(type==='don') Sfx.don(); else Sfx.ka();   // 鼓声：命中即敲，作为太鼓的反馈
+  if(!best) return;
+  let j = 'MISS';
+  if(bestAbs<=TAIKO_WIN.GOOD) j='PERFECT';      // 良
+  else if(bestAbs<=TAIKO_WIN.OK) j='GREAT';     // 可
+  else return;                                   // 在 MISS 窗口内但偏太远 → 不判给分（太鼓里算「不可」）
+  best.hit=true; best.judged=true; best.holding=!!best.hold;
+  if(best.hold){ best.holdStart=now; best.holdNeed=best.hold; best.holdTick=0; }
+  registerHit(best, j, 0);
+  S.soul = Math.max(0, Math.min(100, S.soul + (j==='PERFECT'?1.4 : j==='GREAT'?0.7 : -3)));
+}
+function drawTaiko(t){
+  pctx.clearRect(0,0,V.w,V.h);
+  const hitX = V.w*0.16, cy = V.h*0.5, pps = (V.w - hitX)/approach(), R = V.h*0.085;
+  pctx.save();
+  pctx.strokeStyle = 'rgba(255,255,255,.10)'; pctx.lineWidth = 2;
+  pctx.beginPath(); pctx.moveTo(hitX, cy); pctx.lineTo(V.w, cy); pctx.stroke();
+  pctx.lineWidth = 4; pctx.strokeStyle = 'rgba(255,255,255,.5)';
+  pctx.beginPath(); pctx.arc(hitX, cy, V.h*0.12, 0, 6.283); pctx.stroke();
+  for(const n of S.chart){
+    if(n.hit) continue;
+    const dt = n.t - t;
+    if(dt > approach()+0.05 || dt < -0.22) continue;
+    const x = hitX + dt*pps;
+    pctx.save();
+    if(n.hold){
+      const len = n.hold*pps;
+      pctx.fillStyle = 'rgba(255,210,120,.32)';
+      roundRect(pctx, x, cy-R*0.5, len, R, R*0.5); pctx.fill();
+    }
+    if(n.type==='don'){
+      pctx.shadowColor='#ff5a5a'; pctx.shadowBlur=18;
+      const g=pctx.createRadialGradient(x,cy,2,x,cy,R);
+      g.addColorStop(0,'#ff8a8a'); g.addColorStop(1,'#e23b3b');
+      pctx.fillStyle=g; pctx.beginPath(); pctx.arc(x,cy,R,0,6.283); pctx.fill();
+    } else {
+      pctx.shadowColor='#5ab0ff'; pctx.shadowBlur=18;
+      pctx.lineWidth=Math.max(3,R*0.32); pctx.strokeStyle='#5ab0ff';
+      pctx.beginPath(); pctx.arc(x,cy,R,0,6.283); pctx.stroke();
+      pctx.fillStyle='rgba(90,176,255,.15)'; pctx.fill();
+    }
+    pctx.restore();
+  }
+  for(let i=fxRings.length-1;i>=0;i--){
+    const r=fxRings[i]; r.life-=0.05; r.r+=(r.max-r.r)*0.22;
+    if(r.life<=0){ fxRings.splice(i,1); continue; }
+    pctx.save(); pctx.globalAlpha=Math.max(0,r.life)*0.85; pctx.strokeStyle=r.color;
+    pctx.lineWidth=3.4*r.life+0.6; pctx.shadowColor=r.color; pctx.shadowBlur=22;
+    pctx.beginPath(); pctx.arc(r.x,r.y,r.r,0,6.283); pctx.stroke(); pctx.restore();
+  }
+  pctx.restore();
+}
+function taikoFrame(now, dt){
+  if(S.auto && S.playing){
+    for(const n of S.chart){
+      if(n.hit) continue;
+      if(n.t <= now+0.001 && now-n.t < 0.2){
+        n.hit=true; n.judged=true;
+        if(n.hold){ n.holding=true; n.holdStart=now; n.holdNeed=n.hold; }
+        registerHit(n,'PERFECT',0);
+      }
+    }
+  }
+  for(const n of S.chart){
+    if(!n.hit && now - n.t > TAIKO_WIN.MISS + 0.02){
+      n.hit=true; n.missed=true; n.judged=true;
+      S.judge.MISS++; S.accSum+=0; S.accCount++; S.combo=0;
+      if(S.fever){ S.fever=false; document.body.classList.remove('fever'); }
+      showJudge('MISS'); updHud(); S.soul=Math.max(0,S.soul-3);
+      const arena=$('#catArena'); arena.classList.remove('hit','miss'); void arena.offsetWidth; arena.classList.add('miss');
+    }
+    if(n.hold && n.holding && !n.done){
+      const endT=n.t+n.hold;
+      while(now-(n.holdStart+n.holdTick)>=0.22 && n.holdStart+n.holdTick+0.22<=endT){
+        n.holdTick+=0.22; S.score+=Math.round(18*(S.fever?1.5:1));
+      }
+      if(now>=endT){ n.holding=false; n.done=true; S.score+=Math.round(150*(S.fever?1.5:1)); showJudge('HOLD','HOLD'); }
+    }
+  }
+  drawTaiko(now);
+  dustUpdate(dt||0.016);
+  updLyric(now); tickHud();
+  const pb=$('#progBar'); if(pb) pb.style.width=Math.max(0,Math.min(100, now/S.dur*100))+'%';
+  if(now >= S.dur - 0.15) finish();
+}
 function registerHit(note, j, lane){
   S.judge[j]++;
   S.accSum += ACC_VAL[j]; S.accCount++;
@@ -1000,6 +1267,7 @@ function registerHit(note, j, lane){
     burst(x, V.judgeY, color, j==='PERFECT'?16:9, j==='PERFECT'?1.15:0.8);
   }
   showJudge(j);
+  if(j!=='MISS' && S.mode!=='taiko') Sfx.judge(j);   // 判定音效：贴合歌曲调性，MISS 不出声；太鼓用鼓声代替
   updHud();
   const arena = $('#catArena');
   arena.classList.remove('hit','miss');
@@ -1274,6 +1542,7 @@ function loop(ts){
    从 loop 里抽出来，既能脱离 rAF 单独测（build/qa_judge.js 直接调），
    也让「判定状态机」和「帧调度」分开。 */
 function updateFrame(now, dt){
+  if(S.mode==='taiko'){ taikoFrame(now, dt); return; }
   // 自动演示
   if(S.auto && S.playing){
     for(const n of S.chart){
@@ -1367,6 +1636,19 @@ function pressLane(lane, ts){
     judge(lane, ts);
   }
 }
+/* 输入分发：下落模式按轨道判，太鼓模式按 don/ka 判（lane 0/1→咚，2/3→咔） */
+function pressDisp(lane, ts){
+  if(S.mode==='taiko'){
+    if(S.screen==='game' && !S.paused){
+      const type = lane<=1 ? 'don' : 'ka';
+      const x = V.w*0.16, y = V.h*0.5;
+      fxRings.push({x, y, r:V.h*0.06, max:V.h*0.22, life:1, color: type==='don'?'#ff5a5a':'#5ab0ff'});
+      judgeTaiko(type, ts);
+    }
+  } else {
+    pressLane(lane, ts);
+  }
+}
 
 addEventListener('keydown', e=>{
   if(e.code==='Escape'){
@@ -1380,7 +1662,7 @@ addEventListener('keydown', e=>{
   e.preventDefault();
   if(e.repeat || kbdDown[lane]) return;
   kbdDown[lane]=true; syncDown(lane);
-  pressLane(lane, eventTime(e));
+  pressDisp(lane, eventTime(e));
 });
 addEventListener('keyup', e=>{
   const lane = KEYMAP[e.code];
@@ -1399,7 +1681,7 @@ const activePtr = new Map();
 function ptrPress(e, lane){
   activePtr.set(e.pointerId, lane);
   ptrDown[lane]++; syncDown(lane);
-  pressLane(lane, eventTime(e));
+  pressDisp(lane, eventTime(e));
 }
 function ptrRelease(e){
   const lane = activePtr.get(e.pointerId);
@@ -1531,14 +1813,24 @@ function start(){
   if(!abuf && !audioEl && audioMode!=='clock') return;
   if(typeof window.__beforeStart === 'function' && window.__beforeStart() === false) return;
   unlockAudio();
-  S.chart = chartFor(S.diff);
-  S.slides = buildSlides(S.chart);
+  if(S.mode==='taiko'){
+    S.chart = taikoFor(S.diff);
+    S.slides = [];
+    $('#diffTag').textContent = MODES.find(m=>m.id==='taiko').name + ' · ' + S.chart.length + ' 音符';
+    $('.keys-hint').innerHTML = '<span>D F</span><span>咚</span><span>J K</span><span>咔 · 长按为连打</span>';
+  } else {
+    S.chart = chartFor(S.diff);
+    S.slides = buildSlides(S.chart);
+    $('#diffTag').textContent = DIFFS.find(d=>d.id===S.diff).name + ' · ' + S.chart.length + ' NOTES';
+    $('.keys-hint').innerHTML = '<span>D</span><span>F</span><span>J</span><span>K · 长按可延音</span>';
+  }
   S.judge = {PERFECT:0,GREAT:0,GOOD:0,MISS:0};
   S.combo=0; S.maxCombo=0; S.score=0; S.accSum=0; S.accCount=0; S.fever=false; S.t=0;
+  S.soul = 50;          // 太鼓魂槽（0~100），过关用，这里只做展示
   lastScoreShown=0; lyricIdx=-1; parts.length=0; fxRings.length=0;
   document.body.classList.remove('fever');
+  $('#gSongTitle').textContent = SONG.title || SONG.meta.title;
   $('#scoreLbl').textContent='0'; $('#accLbl').textContent='100.00%'; $('#comboMini').textContent='0 COMBO';
-  $('#diffTag').textContent = DIFFS.find(d=>d.id===S.diff).name + ' · ' + S.chart.length + ' NOTES';
   $('#lyricNow').textContent=''; $('#lyricNext').textContent='';
   setScreen('game');
   resize();
@@ -1619,6 +1911,93 @@ function fmtDur(s){
   return m+':'+String(ss).padStart(2,'0');
 }
 
+/* ---------- 选曲 ---------- */
+async function applySong(idx){
+  if(idx===S.songIdx && SONG===SONGS[idx]) return;
+  S.songIdx = idx; SONG = SONGS[idx];
+  AUDIO_SRC = SONG.audio || "song.mp3";
+  S.dur = SONG.meta.duration || S.dur;
+  const m = SONG.meta;
+  $('#composerLbl').textContent = m.composer || '—';
+  $('#lyricistLbl').textContent = m.lyricist || '—';
+  $('#srcLbl').textContent = m.source || '—';
+  $('#bpmLbl').textContent = m.bpm ? m.bpm.toFixed(1) : '--';
+  $('#durLbl').textContent = fmtDur(S.dur);
+  $('#resSong') && ($('#resSong').textContent = SONG.title || m.title);
+  if(AUDIO_SRC !== S.loadedAudioFor){
+    $('#loadTxt').textContent = '正在载入音轨';
+    $('#loading').classList.remove('off');
+    try{ await loadAudio(); S.loadedAudioFor = AUDIO_SRC; }
+    catch(e){ bootFail(e); }
+    setTimeout(()=> $('#loading').classList.add('off'), 300);
+  }
+}
+function buildSongs(){
+  const wrap = $('#songs'); if(!wrap) return;
+  wrap.innerHTML = '';
+  SONGS.forEach((s, i)=>{
+    const el = document.createElement('div');
+    el.className = 'song' + (i===S.songIdx?' sel':'');
+    el.textContent = s.title;
+    el.onclick = async ()=>{
+      if(i===S.songIdx) return;
+      [...wrap.children].forEach(c=>c.classList.remove('sel'));
+      el.classList.add('sel');
+      await applySong(i); refreshBest();
+    };
+    wrap.appendChild(el);
+  });
+}
+function applyMode(){
+  const m = MODES.find(x=>x.id===S.mode) || MODES[0];
+  $('#modesBtn').textContent = '模式：' + m.name;
+}
+
+/* ---------- 个性化主题 ---------- */
+function applyTheme(){
+  const t = THEMES.find(x=>x.id===S.theme) || THEMES[0];
+  const r = document.documentElement.style;
+  r.setProperty('--mint', t.mint); r.setProperty('--amber', t.amber); r.setProperty('--pink', t.pink);
+  r.setProperty('--peach', t.peach); r.setProperty('--coral', t.coral);
+  r.setProperty('--violet', t.violet); r.setProperty('--blue', t.blue);
+  document.body.dataset.cat = t.cat;
+  LANE_COLORS = t.lanes.slice();
+  S.catColor = t.cat;
+}
+function buildDress(){
+  const wrap = $('#themes'); if(!wrap) return;
+  wrap.innerHTML = '';
+  THEMES.forEach(t=>{
+    const el = document.createElement('div');
+    el.className = 'theme' + (t.id===S.theme?' sel':'');
+    el.style.background = 'linear-gradient(135deg,'+t.mint+','+t.amber+' 45%,'+t.pink+')';
+    el.title = t.name;
+    el.onclick = ()=>{
+      S.theme = t.id; applyTheme();
+      [...wrap.children].forEach(c=>c.classList.remove('sel'));
+      el.classList.add('sel');
+      saveCustom();
+    };
+    wrap.appendChild(el);
+  });
+  const ni = $('#nickInput');
+  if(ni){
+    ni.value = S.nick || '';
+    ni.oninput = ()=>{ S.nick = ni.value.trim(); saveCustom(); $('#nickLbl') && ($('#nickLbl').textContent = S.nick); };
+  }
+}
+function saveCustom(){
+  try{
+    localStorage.setItem('qc_custom', JSON.stringify({theme:S.theme, nick:S.nick}));
+  }catch(e){}
+}
+function loadCustom(){
+  try{
+    const raw = localStorage.getItem('qc_custom');
+    if(raw){ const o = JSON.parse(raw); if(o.theme) S.theme=o.theme; if(o.nick!=null) S.nick=o.nick; }
+  }catch(e){}
+}
+
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden && S.screen==='game' && !S.paused && S.playing) pause();
 });
@@ -1632,12 +2011,20 @@ function bindSettings(){
   offRange2.oninput = ()=> syncOff(+offRange2.value);
   spdRange.oninput = ()=>{ S.speed = +spdRange.value; spdVal.textContent = S.speed.toFixed(2).replace(/0$/,'')+'×'; };
   volRange.oninput = ()=>{ setVolume(+volRange.value/100); volVal.textContent = volRange.value+'%'; };
+  const sfxRange=$('#sfxRange'), sfxVal=$('#sfxVal'), sfxSw=$('#sfxSw');
+  sfxRange.oninput = ()=>{ S.sfxVol = +sfxRange.value/100; sfxVal.textContent = sfxRange.value+'%'; Sfx.setVol(S.sfxVol); };
+  sfxSw.onclick = ()=>{ S.sfxOn = !S.sfxOn; sfxSw.classList.toggle('on', S.sfxOn); Sfx.setEnabled(S.sfxOn); };
   autoSw.onclick = ()=>{ S.auto = !S.auto; autoSw.classList.toggle('on', S.auto); };
 
   $('#settingBtn').onclick = ()=> $('#settingOverlay').classList.add('on');
   $('#settingClose').onclick = ()=> $('#settingOverlay').classList.remove('on');
   $('#helpBtn').onclick = ()=> $('#helpOverlay').classList.add('on');
   $('#helpClose').onclick = ()=> $('#helpOverlay').classList.remove('on');
+  $('#dressBtn').onclick = ()=>{ buildDress(); $('#dressOverlay').classList.add('on'); };
+  $('#dressClose').onclick = ()=> $('#dressOverlay').classList.remove('on');
+  $('#modesBtn').onclick = ()=>{ const i=MODES.findIndex(m=>m.id===S.mode); S.mode=MODES[(i+1)%MODES.length].id; applyMode(); };
+  const sfxRange2=$('#sfxRange2');
+  if(sfxRange2) sfxRange2.oninput = ()=>{ S.sfxVol=+sfxRange2.value/100; Sfx.setVol(S.sfxVol); const sr=$('#sfxRange'); if(sr) sr.value=sfxRange2.value; const sv=$('#sfxVal'); if(sv) sv.textContent=sfxRange2.value+'%'; };
   $('#startBtn').onclick = ()=> start();
   $('#retryBtn').onclick = ()=> start();
   $('#backBtn').onclick = ()=> { setScreen('title'); refreshBest(); };
@@ -1700,7 +2087,14 @@ function proceed(){
   S.accents = SONG.accents || [];
   $('#bpmLbl').textContent = SONG.meta.bpm ? SONG.meta.bpm.toFixed(1) : '--';
   $('#durLbl').textContent = fmtDur(S.dur);
-  buildDiffs(); refreshBest(); bindSettings();
+  loadCustom();
+  applyTheme();
+  $('#songTitleH1').innerHTML = ((SONG.title||'')).replace(' ', '<br/>') || '嘶恍而过的<br/>青葱岁月';
+  $('#composerLbl').textContent = SONG.meta.composer || '—';
+  $('#lyricistLbl').textContent = SONG.meta.lyricist || '—';
+  $('#srcLbl').textContent = SONG.meta.source || '—';
+  $('#resSong') && ($('#resSong').textContent = SONG.title || SONG.meta.title);
+  buildSongs(); buildDiffs(); applyMode(); refreshBest(); bindSettings();
   resize();
   raf = requestAnimationFrame(loop);
   setTimeout(()=> $('#loading').classList.add('off'), 320);

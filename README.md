@@ -13,14 +13,23 @@
 
 **玩法**
 - 4 轨下落式，`D F J K` / 方向键 / 触屏 / 手柄四种输入
-- 判定窗口 PERFECT ±70ms · GREAT ±110ms · GOOD ±155ms · MISS ±200ms
-  （参考 osu!mania：MISS 窗口 188−3×OD，OD0 时 188ms；键盘玩法 PERFECT 才 16ms，
-  触屏手指误差远大于此，所以按手机手感放宽）
-- **跨轨宽容**：本轨没够到音符时，相邻轨可在更紧的 78ms 窗口内接手，点偏一格不算空按
+- 判定窗口 PERFECT ±85ms · GREAT ±140ms · GOOD ±200ms · MISS ±280ms
+  （休闲向，比手机音游 Phigros 的 PERFECT ±80ms 还松；参考 osu!mania / StepMania / DDR / 太鼓次郎
+  多款开源音游后取的手感下界，触屏手指误差远大于键盘，判定偏多半是设备/音频延迟未补偿——
+  可在设置里调「判定偏移」）
+- **跨轨宽容 100ms**：本轨没够到音符时，相邻轨可在 100ms 窗口内接手，点偏一格不算空按
 - **长按有完整判定**：按住期间每 0.22s 持续得分，按满出 `HOLD` 收尾判定 +150，
   中途松开只丢收尾奖励并提示「断」，不判 MISS、不断连
 - **连线滑条**：相邻轨快速连打的音符自动组成一条链，用光带连起来并带方向箭头，
-  按住横向滑过去即可（阈值：间隔 ≤0.45s、跨 1~2 格、链长 ≥3；HARD 68 条覆盖 261 个音符）
+  按住横向滑过去即可（阈值：间隔 ≤0.45s、跨 1~2 格、链长 ≥3；HARD 68 条覆盖 261 个音符；
+  已修复：链尾音符不再画指向空白的箭头）
+- **太鼓模式**：红=咚 / 蓝=咔 的横向玩法，谱面由四轨谱自动派生（低音轨→咚、高音轨→咔），
+  命中即敲合成鼓声，与节奏天然契合；判定窗口 良 ±85ms / 可 ±150ms / 不可 ±220ms
+- **判定音效**：WebAudio 振荡器合成、先用自相关估计歌曲基频并吸附到调内五声音阶，
+  判定音落在歌曲音阶里天然不违和；PERFECT 高八度、GREAT 纯五度、GOOD 根音，MISS 不出声；
+  音量压在音乐之下，可在设置里调判定音音量或关闭
+- **个性化**：4 套主题配色（青葱 / 樱粉 / 暮蓝 / 猫橙）瞬间换肤 + 自定义昵称，存本地
+- **多歌曲框架**：标题页可直接选曲，示例曲《嘶恍而过的青葱岁月》@汽水音乐（署名：许许许许许丶若辰）
 - 50 连击进入 FEVER ×1.5，三难度、准确率评级、本机最佳分
 
 **谱面由音频分析离线生成，不套固定 BPM 网格**
@@ -61,12 +70,14 @@
 ```
 build/
   analyze.py          音频分析 + 谱面生成（需 numpy + ffmpeg）
-  build.py            注入音轨/谱面/平台层 → 产出单文件 index.html
-  game.template.html  游戏本体模板（UI、判定、绘制、输入、手柄）
+  build.py            注入音轨/谱面/平台层 → 产出单文件 index.html + 分包 dist/
+  game.template.html  游戏本体模板（UI、判定、绘制、输入、手柄、太鼓、主题）
   platform.css        Toy 平台层样式（体力/排行榜/分享/老板键）
   platform.js         Toy 平台层逻辑（SDK 封装、存档、防刷校验）
   assemble.py         录屏帧 + 音轨合成演示视频
-  qa2.js              自动化自测（CDP 驱动无头浏览器，35 项）
+  qa2.js              自动化自测（CDP 驱动无头浏览器，平台层/体力/多端，35 项）
+  qa_judge.js        判定手感专项自测（窗口/跨轨/长按/滑条，21 项）
+  qa_features.js     新功能自测（多歌曲/主题/太鼓/音效/滑条链尾，20 项）
   shots.js            多尺寸截图
   measure*.js         布局溢出自检
 ```
@@ -86,8 +97,8 @@ python build/analyze.py 你的音频.m4a 你的歌词.lrc build
 
 # 3) 注入模板，产出两份
 python build/build.py
-# → index.html        单文件版 3.9MB，音轨内嵌，双击即玩 / 适合 itch.io
-# → dist/             分包版 index.html 142KB + song.mp3 2.8MB，适合 B站 Toy
+# → index.html        单文件版 ~3.9MB，音轨内嵌，双击即玩 / 适合 itch.io
+# → dist/             分包版 index.html ~169KB + song.mp3 2.8MB，适合 B站 Toy
 ```
 
 为什么要有两份：B 站 Toy 限制 **`index.html` 解压后 ≤ 1MB**，内嵌 base64 音轨会直接超限被拒（提示「请将内联的脚本、样式或图片拆成独立文件」）。分包版把音轨改成相对路径 `song.mp3`，正文只有 142KB。
@@ -99,13 +110,16 @@ python build/build.py
 ```bash
 node build/qa2.js        # 平台层 / 体力 / 存档 / 多端适配，35 项
 node build/qa_judge.js   # 判定手感专项：窗口 / 跨轨宽容 / 长按 / 滑条，21 项
+node build/qa_features.js# 新功能：多歌曲 / 主题 / 太鼓 / 音效 / 滑条链尾，20 项
 node build/shots.js      # 生成桌面 / 竖屏 / 横屏 / 弹层截图
 node build/shot_slide.js # 截一张滑条画面
 ```
 
 `qa2.js` 覆盖 35 项：加载、体力增减与离线恢复、每日上限、结算入库、异常分数拦截、排行榜与分享弹层、老板键、竖横屏重排、手柄映射、触屏点按/滑打/多指、健康忠告。
 
-`qa_judge.js` 覆盖 21 项：窗口常量、偏早/偏晚 65ms 仍判 PERFECT、偏 100ms 判 GREAT、点偏一格命中、超窗口不误判、长按持续得分与 HOLD 收尾、长按中断不判 MISS、滑条链生成与方向。判定逻辑通过 `updateFrame(now)` 调用，可脱离 rAF 逐帧驱动。
+`qa_judge.js` 覆盖 21 项：窗口常量（PERFECT ±85 / GREAT ±140 / MISS ±280 / 跨轨 100ms）、偏早/偏晚 65ms 仍判 PERFECT、偏 100ms 判 GREAT、点偏一格命中、超窗口不误判、长按持续得分与 HOLD 收尾、长按中断不判 MISS、滑条链生成与方向。
+
+`qa_features.js` 覆盖 20 项：多歌曲数组与汽水音乐署名、主题切换改写 CSS 变量与四轨色、昵称/主题存读回环、太鼓模式派生谱面与判定、判定音效调用链（MISS 静默）、滑条链尾无箭头。
 
 ### 在手机上测
 
@@ -125,7 +139,7 @@ python -m http.server 8080
 Toy 有两条硬限制，直接决定了产物形态：
 
 - **`index.html` 解压后 ≤ 1MB** → 音轨不能内嵌（内嵌版 3.9MB），必须用 `dist/` 分包版
-- **不允许内联脚本/样式/图片** → 但本项目脚本本来就在 `<script>` 里，真正超标的是 base64 音轨；拆出 `song.mp3` 后 index.html 仅 143KB，两条限制同时满足
+- **不允许内联脚本/样式/图片** → 但本项目脚本本来就在 `<script>` 里，真正超标的是 base64 音轨；拆出 `song.mp3` 后 index.html 仅 169KB，两条限制同时满足
 
 ```bash
 python build/build.py      # 产出 dist/index.html + dist/song.mp3

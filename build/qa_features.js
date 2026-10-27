@@ -1,0 +1,199 @@
+/* 新功能专项自测：多歌曲 / 个性化主题 / 太鼓模式 / 判定音效 / 滑条链尾无箭头
+ * 用法：node build/qa_features.js   （PAGE_URL 可选，默认本地 index.html）
+ */
+const { spawn } = require('child_process');
+const path = require('path');
+const os = require('os');
+
+const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
+const PORT = 9453;
+const PAGE = process.env.PAGE_URL || ('file:///' + path.resolve(__dirname, '..', 'index.html').replace(/\\/g, '/'));
+const PROF = path.join(os.tmpdir(), 'qcfeat_' + Date.now());
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+(async () => {
+  const edge = spawn(EDGE, [
+    '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+    '--remote-debugging-port=' + PORT, '--user-data-dir=' + PROF,
+    '--allow-file-access-from-files', '--mute-audio',
+    ...(process.env.NO_PROXY ? ['--no-proxy-server', '--proxy-bypass-list=*'] : []),
+    '--window-size=1280,860', PAGE
+  ], { stdio: 'ignore' });
+
+  let ws;
+  for (let i = 0; i < 60; i++) {
+    try {
+      const r = await fetch('http://127.0.0.1:' + PORT + '/json/list');
+      const list = await r.json();
+      const pg = list.find(t => t.type === 'page' && t.webSocketDebuggerUrl);
+      if (pg) { ws = new WebSocket(pg.webSocketDebuggerUrl); break; }
+    } catch (e) {}
+    await sleep(250);
+  }
+  if (!ws) { console.error('CDP 连接失败'); edge.kill(); process.exit(1); }
+
+  let id = 0; const pend = new Map();
+  await new Promise(r => ws.addEventListener('open', r));
+  ws.addEventListener('message', ev => {
+    const m = JSON.parse(ev.data);
+    if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); }
+  });
+  const send = (method, params = {}) => new Promise(res => {
+    const i = ++id; pend.set(i, res);
+    ws.send(JSON.stringify({ id: i, method, params }));
+  });
+  const ev = async expr => {
+    const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
+    if (r.result && r.result.exceptionDetails) {
+      const d = r.result.exceptionDetails;
+      return { __err: (d.exception && d.exception.description) || d.text };
+    }
+    return r.result && r.result.result ? r.result.result.value : undefined;
+  };
+  const J = (s, tag) => { if (typeof s === 'string' && s.startsWith('ERR:')) throw new Error(tag + ' ' + s); return JSON.parse(s); };
+
+  await send('Runtime.enable');
+  await send('Page.enable');
+  await send('Page.navigate', { url: PAGE });
+  let ready = false;
+  for (let i = 0; i < 80; i++) {
+    const st = await ev(`(document.readyState==='complete' && !!document.getElementById('loading'))?'ok':(document.readyState)`);
+    if (st === 'ok') { ready = true; break; }
+    await sleep(250);
+  }
+  if (!ready) { console.error('页面就绪超时'); edge.kill(); process.exit(1); }
+  await sleep(2500);
+
+  const out = [];
+  const T = (name, ok, extra) => out.push([ok ? 'PASS' : 'FAIL', name, extra === undefined ? '' : String(extra)]);
+
+  /* ---- 1. 多歌曲框架 ---- */
+  const song = await ev(`JSON.stringify({
+    n: (typeof SONGS!=='undefined'?SONGS.length:0),
+    hasId: !!(SONG && SONG.id),
+    title: SONG?SONG.title:'',
+    composer: (SONG&&SONG.meta)?(SONG.meta.composer||''):'',
+    lyricist: (SONG&&SONG.meta)?(SONG.meta.lyricist||''):'',
+    source: (SONG&&SONG.meta)?(SONG.meta.source||''):'',
+    audio: (typeof AUDIO_SRC!=='undefined' && AUDIO_SRC && AUDIO_SRC.indexOf('data:')===0)?'inline':'external'
+  })`);
+  const s = J(song, 'song');
+  T('多歌曲数组已就绪（≥1 首）', s.n >= 1, 'songs=' + s.n);
+  T('首曲含 id 与标题', !!s.hasId && !!s.title, s.title);
+  T('汽水音乐署名已写入（作曲/作词）', /许/.test(s.composer) && /许/.test(s.lyricist), '作曲=' + s.composer + ' 作词=' + s.lyricist);
+  T('来源标签为汽水音乐', s.source === '汽水音乐', 'source=' + s.source);
+  T('音轨以内嵌 data URI 打包（离线可玩）', s.audio === 'inline');
+  const applyOk = await ev(`(function(){ try{ applySong(0); return 'ok'; }catch(e){ return 'ERR:'+e.message; } })()`);
+  T('applySong(0) 不抛错', applyOk === 'ok', applyOk);
+
+  /* ---- 2. 个性化主题 ---- */
+  const theme1 = await ev(`JSON.stringify({n: THEMES.length, ids: THEMES.map(t=>t.id), mint0: getComputedStyle(document.documentElement).getPropertyValue('--mint').trim()})`);
+  const th = J(theme1, 'theme');
+  T('主题系统含 4 套配色', th.n === 4, 'ids=' + th.ids.join(','));
+  // 切到樱粉，验证 --mint CSS 变量被改写
+  const theme2 = await ev(`(function(){
+    S.theme='sakura'; applyTheme();
+    var m = getComputedStyle(document.documentElement).getPropertyValue('--mint').trim();
+    var lanes = (typeof LANE_COLORS!=='undefined')?LANE_COLORS.slice():[];
+    return JSON.stringify({mint:m, lanes0:lanes[0], cat:document.body.dataset.cat});
+  })()`);
+  const th2 = J(theme2, 'theme2');
+  T('applyTheme 改写 --mint 变量', th2.mint !== th.mint0 && !!th2.mint, 'mint=' + th2.mint);
+  T('applyTheme 改写四轨颜色', th2.lanes0 === '#ff8fb1', 'lanes[0]=' + th2.lanes0);
+  // 存读回环
+  const theme3 = await ev(`(function(){
+    S.theme='dusk'; S.nick='小青葱'; saveCustom();
+    S.theme='qc'; S.nick=''; loadCustom();
+    return JSON.stringify({theme:S.theme, nick:S.nick});
+  })()`);
+  const th3 = J(theme3, 'theme3');
+  T('saveCustom/loadCustom 昵称与主题回环', th3.theme === 'dusk' && th3.nick === '小青葱', 'theme=' + th3.theme + ' nick=' + th3.nick);
+
+  /* ---- 3. 太鼓模式 ---- */
+  const tk1 = await ev(`JSON.stringify({
+    hasTaiko: MODES.some(m=>m.id==='taiko'),
+    win: (typeof TAIKO_WIN!=='undefined')?TAIKO_WIN:{},
+    modesBtn: (document.getElementById('modesBtn')||{}).textContent||''
+  })`);
+  const tk = J(tk1, 'tk');
+  T('模式列表含太鼓', tk.hasTaiko);
+  T('太鼓判定窗口存在（良/可/不可）', tk.win.GOOD>0 && tk.win.OK>0 && tk.win.MISS>0, JSON.stringify(tk.win));
+  const tk2 = await ev(`(function(){
+    S.mode='taiko'; applyMode();
+    var arr = taikoFor('easy');
+    var don = arr.filter(n=>n.type==='don').length, ka = arr.filter(n=>n.type==='ka').length;
+    return JSON.stringify({btn:document.getElementById('modesBtn').textContent, total:arr.length, don:don, ka:ka});
+  })()`);
+  const tk2v = J(tk2, 'tk2');
+  T('applyMode 文案含「太鼓」', /太鼓/.test(tk2v.btn), tk2v.btn);
+  T('太鼓谱由四轨派生（咚/咔均有）', tk2v.total>0 && tk2v.don>0 && tk2v.ka>0, `total=${tk2v.total} don=${tk2v.don} ka=${tk2v.ka}`);
+  // 太鼓判定 + 魂槽不抛错，且命中可加魂
+  const tk3 = await ev(`(function(){
+    S.mode='taiko'; S.judge={PERFECT:0,GREAT:0,GOOD:0,MISS:0}; S.score=0; S.combo=0; S.soul=50;
+    S.chart = taikoFor('easy');
+    // 把第一个音符时间对齐到当前歌曲时间，制造一次命中
+    var now = songTime(); var n0 = S.chart[0]; n0.t = now; n0.hit=false; n0.judged=false;
+    judgeTaiko(n0.type, now);
+    return JSON.stringify({judged:S.judge.PERFECT+S.judge.GREAT, soul:S.soul});
+  })()`);
+  const tk3v = J(tk3, 'tk3');
+  T('judgeTaiko 命中即判定且敲鼓不出错', tk3v.judged >= 1, 'judged=' + tk3v.judged + ' soul=' + tk3v.soul);
+  // 太鼓渲染不抛错
+  const tk4 = await ev(`(function(){ try{ S.mode='taiko'; S.chart=taikoFor('easy'); drawTaiko(songTime()); taikoFrame(songTime(),0.016); return 'ok'; }catch(e){ return 'ERR:'+e.message; } })()`);
+  T('太鼓渲染/帧逻辑不抛错', tk4 === 'ok', tk4);
+  // 复位为经典
+  await ev(`(function(){ S.mode='classic'; applyMode(); })()`);
+
+  /* ---- 4. 判定音效 ---- */
+  const sfx1 = await ev(`JSON.stringify({
+    has: typeof Sfx!=='undefined',
+    methods: (typeof Sfx!=='undefined')?['init','judge','don','ka','setEnabled','setVol','resume','ensure'].filter(m=>typeof Sfx[m]==='function'):[]
+  })`);
+  const sx = J(sfx1, 'sfx');
+  T('Sfx 模块存在且方法齐全', sx.has && sx.methods.length === 8, sx.methods.join(','));
+  const sfx2 = await ev(`(function(){
+    try{
+      Sfx.init(abuf); Sfx.setVol(0.5); Sfx.setEnabled(true);
+      Sfx.judge('PERFECT'); Sfx.judge('GREAT'); Sfx.judge('GOOD'); Sfx.don(); Sfx.ka();
+      // 关闭后 judge 不应抛错（静默）
+      Sfx.setEnabled(false); Sfx.judge('PERFECT'); Sfx.setEnabled(true);
+      return 'ok';
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  T('判定音效调用链不抛错（含 MISS 静默）', sfx2 === 'ok', sfx2);
+  // 经典模式判 PERFECT 会触发 Sfx.judge 而非鼓声
+  const sfx3 = await ev(`(function(){
+    S.mode='classic'; S.sfxOn=true;
+    S.chart = chartFor('easy'); S.judge={PERFECT:0,GREAT:0,GOOD:0,MISS:0}; S.score=0; S.combo=0;
+    var now = songTime(); var n0 = S.chart.find(n=>n.lane===0); n0.t=now; n0.hit=false; n0.judged=false;
+    judge(0, now);
+    return JSON.stringify({judged:S.judge.PERFECT+S.judge.GREAT+S.judge.GOOD});
+  })()`);
+  const sx3 = J(sfx3, 'sfx3');
+  T('经典模式判定音挂载（命中正常判定）', sx3.judged >= 1, 'judged=' + sx3.judged);
+
+  /* ---- 5. 滑条链尾无箭头 ---- */
+  const slide = await ev(`(function(){
+    // 构造一条 3 连音符链，调用内部 buildSlides
+    var list = [
+      {t:1.0, lane:0, hold:0, hit:false, judged:false, holding:false, done:false, holdTick:0},
+      {t:1.3, lane:1, hold:0, hit:false, judged:false, holding:false, done:false, holdTick:0},
+      {t:1.6, lane:0, hold:0, hit:false, judged:false, holding:false, done:false, holdTick:0}
+    ];
+    var chains = buildSlides(list);
+    var ch = chains[0];
+    var tail = ch[ch.length-1];
+    return JSON.stringify({chains:chains.length, tailSlideDir:tail.slideDir, tailSlide:tail.slide, midDir:ch[0].slideDir});
+  })()`);
+  const sl = J(slide, 'slide');
+  T('滑条链生成且链尾不画箭头', sl.chains === 1 && sl.tailSlide === true && sl.tailSlideDir === 0, `tailDir=${sl.tailSlideDir} midDir=${sl.midDir}`);
+
+  // 输出
+  console.log('\n================ 新功能专项自测 ================');
+  out.forEach(([k, n, e]) => console.log(`${k === 'PASS' ? '✅' : '❌'} ${n}${e ? '  —  ' + e : ''}`));
+  const fail = out.filter(o => o[0] === 'FAIL').length;
+  console.log(`\n合计 ${out.length} 项，失败 ${fail} 项`);
+
+  ws.close(); edge.kill();
+  setTimeout(() => process.exit(fail ? 1 : 0), 300);
+})().catch(e => { console.error(e); process.exit(1); });

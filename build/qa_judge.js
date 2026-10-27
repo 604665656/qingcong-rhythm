@@ -73,10 +73,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   /* 1. 窗口常量 */
   const w = await ev(`JSON.stringify({p:WIN.PERFECT,g:WIN.GREAT,o:WIN.GOOD,m:WIN.MISS,a:LANE_ASSIST})`);
   const W = J(w, 'w');
-  T('判定窗口已放宽 PERFECT ±70ms', Math.abs(W.p - 0.07) < 1e-6, W.p * 1000 + 'ms');
-  T('判定窗口已放宽 GREAT ±110ms', Math.abs(W.g - 0.11) < 1e-6, W.g * 1000 + 'ms');
-  T('MISS 窗口 200ms', Math.abs(W.m - 0.2) < 1e-6, W.m * 1000 + 'ms');
-  T('跨轨宽容 78ms 已启用', Math.abs(W.a - 0.078) < 1e-6, W.a * 1000 + 'ms');
+  T('判定窗口 PERFECT ±85ms（休闲向，比 Phigros ±80 更松）', Math.abs(W.p - 0.085) < 1e-6, W.p * 1000 + 'ms');
+  T('判定窗口 GREAT ±140ms', Math.abs(W.g - 0.14) < 1e-6, W.g * 1000 + 'ms');
+  T('MISS 窗口 280ms', Math.abs(W.m - 0.28) < 1e-6, W.m * 1000 + 'ms');
+  T('跨轨宽容 100ms 已启用', Math.abs(W.a - 0.10) < 1e-6, W.a * 1000 + 'ms');
 
   /* 2. 单音判定：在 PERFECT 窗口内偏 65ms 仍给 PERFECT */
   const one = await ev(`(function(){
