@@ -19,3 +19,5 @@
 *.log
 .DS_Store
 Thumbs.db
+/web/
+/dist/

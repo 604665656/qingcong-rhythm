@@ -512,7 +512,8 @@ __PLATFORM_CSS__
    原创实现：谱面由音频起始点分析离线生成
    ============================================================ */
 const SONG = __SONG_DATA__;
-const AUDIO_DATA_URI = "__AUDIO__";
+/* 音轨地址：单文件版是 data: URI，分包版是相对路径 song.mp3 */
+const AUDIO_SRC = "__AUDIO__";
 
 /* 移动端没有控制台，把运行错误直接印到加载页，避免"卡住但没提示" */
 window.addEventListener('error', function(e){
@@ -671,6 +672,15 @@ function b64ToBuf(uri){
   for(let i=0;i<len;i++) u8[i] = bin.charCodeAt(i);
   return u8.buffer;
 }
+/* 音轨两种形态都支持：
+   内嵌（data: URI，单文件版，离线可玩） / 外链（相对路径，B站 Toy 有 1MB 单文件上限，必须拆出来） */
+function isDataUri(s){ return /^data:/i.test(s); }
+async function loadAudioBytes(src){
+  if(isDataUri(src)) return b64ToBuf(src);
+  const res = await fetch(src, { cache: 'force-cache' });
+  if(!res.ok) throw new Error('读取音轨失败 HTTP ' + res.status);
+  return await res.arrayBuffer();
+}
 /* 旧版 Safari 的 decodeAudioData 只支持回调形式（返回值是 undefined），
    新版同时返回 Promise。这里两种都接住，谁先回来用谁。 */
 function decodeAny(ctx, raw, ms){
@@ -686,11 +696,11 @@ function decodeAny(ctx, raw, ms){
     if(ret && typeof ret.then === 'function') ret.then(ok, bad);
   });
 }
-function blobUrlFor(u8){
+function blobUrlFor(buf){
   try{
-    return URL.createObjectURL(new Blob([u8], {type:'audio/mpeg'}));
+    return URL.createObjectURL(new Blob([buf], {type:'audio/mpeg'}));
   }catch(e){
-    return AUDIO_DATA_URI;   // 极端情况下退回 data URI
+    return AUDIO_SRC;   // 极端情况下直接用原始地址
   }
 }
 const nowSec = () => performance.now()/1000;
@@ -701,25 +711,32 @@ function setVolume(v){
 }
 async function loadAudio(){
   const say = t => { const n = $('#loadTxt'); if(n) n.textContent = t; };
-  let u8 = null;
-  try{ u8 = new Uint8Array(b64ToBuf(AUDIO_DATA_URI)); }catch(e){ u8 = null; }
+  let bytes = null;
+  try{
+    if(!isDataUri(AUDIO_SRC)) say('正在下载音轨…');
+    bytes = await loadAudioBytes(AUDIO_SRC);
+  }catch(e){
+    console.warn('[audio] 音轨读取失败：', (e && e.message) || e);
+    bytes = null;
+  }
 
   /* ---------- 路径 1：WebAudio 精确时钟 ---------- */
-  try{
-    say('正在解码音轨…');
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if(!AC) throw new Error('浏览器不支持 AudioContext');
-    actx = new AC({latencyHint:'interactive'});
-    gainNode = actx.createGain(); gainNode.gain.value = S.vol; gainNode.connect(actx.destination);
-    const raw = u8 ? u8.buffer.slice(0) : b64ToBuf(AUDIO_DATA_URI);
-    const buf = await decodeAny(actx, raw, 20000);
-    if(!buf || !buf.duration || !isFinite(buf.duration)) throw new Error('解码结果无效');
-    abuf = buf; audioMode = 'webaudio'; S.dur = buf.duration;
-    return;
-  }catch(err){
-    console.warn('[audio] WebAudio 路径不可用：', (err && (err.message||err)) || err);
-    try{ if(actx && actx.close) actx.close(); }catch(e){}
-    actx = null; gainNode = null; abuf = null;
+  if(bytes){
+    try{
+      say('正在解码音轨…');
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) throw new Error('浏览器不支持 AudioContext');
+      actx = new AC({latencyHint:'interactive'});
+      gainNode = actx.createGain(); gainNode.gain.value = S.vol; gainNode.connect(actx.destination);
+      const buf = await decodeAny(actx, bytes.slice(0), 20000);
+      if(!buf || !buf.duration || !isFinite(buf.duration)) throw new Error('解码结果无效');
+      abuf = buf; audioMode = 'webaudio'; S.dur = buf.duration;
+      return;
+    }catch(err){
+      console.warn('[audio] WebAudio 路径不可用：', (err && (err.message||err)) || err);
+      try{ if(actx && actx.close) actx.close(); }catch(e){}
+      actx = null; gainNode = null; abuf = null;
+    }
   }
 
   /* ---------- 路径 2：<audio> 元素 + Blob URL（iOS 上远比 data: URI 稳） ---------- */
@@ -730,7 +747,7 @@ async function loadAudio(){
     audioEl.setAttribute('playsinline','');
     audioEl.setAttribute('webkit-playsinline','');
     audioEl.preload = 'auto'; audioEl.volume = S.vol;
-    audioEl.src = blobUrlFor(u8);
+    audioEl.src = bytes ? blobUrlFor(bytes) : AUDIO_SRC;
     audioEl.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none;';
     document.body.appendChild(audioEl);
     audioEl.load();

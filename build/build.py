@@ -1,39 +1,68 @@
 # -*- coding: utf-8 -*-
-"""把 chart.json + song.mp3 注入模板，产出单文件 index.html"""
-import base64, json, os, sys
+"""把 chart.json + song.mp3 注入模板，产出两份：
+   1) index.html      单文件版（音轨内嵌 base64，离线双击即玩 / 适合 itch.io）
+   2) dist/           分包版（index.html + song.mp3，index.html 仅 ~150KB）
+                      B 站 Toy 限制「index.html 解压后 ≤ 1MB」，必须用这一版
+"""
+import base64, json, os, shutil, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUILD = os.path.join(ROOT, "build")
 OUT = os.path.join(ROOT, "index.html")
+DIST = os.path.join(ROOT, "dist")
+
+TAGS = ("__SONG_DATA__", "__AUDIO__", "__PLATFORM_CSS__", "__PLATFORM_JS__")
+
+
+def render(tpl, chart, plat_css, plat_js, audio_value):
+    html = (tpl.replace("__SONG_DATA__", chart)
+               .replace("__AUDIO__", audio_value)
+               .replace("__PLATFORM_CSS__", plat_css)
+               .replace("__PLATFORM_JS__", plat_js))
+    for tag in TAGS:
+        assert tag not in html, "占位符未替换: " + tag
+    return html
 
 
 def main():
     tpl = open(os.path.join(BUILD, "game.template.html"), encoding="utf-8").read()
-    chart = json.load(open(os.path.join(BUILD, "chart.json"), encoding="utf-8"))
+    chart_raw = json.load(open(os.path.join(BUILD, "chart.json"), encoding="utf-8"))
     mp3 = os.path.join(BUILD, "song.mp3")
     b64 = base64.b64encode(open(mp3, "rb").read()).decode("ascii")
 
     plat_css = open(os.path.join(BUILD, "platform.css"), encoding="utf-8").read()
     plat_js = open(os.path.join(BUILD, "platform.js"), encoding="utf-8").read()
 
-    song_json = json.dumps(chart, ensure_ascii=False, separators=(",", ":"))
-    html = (tpl.replace("__SONG_DATA__", song_json)
-               .replace("__AUDIO__", "data:audio/mpeg;base64," + b64)
-               .replace("__PLATFORM_CSS__", plat_css)
-               .replace("__PLATFORM_JS__", plat_js)
-               .replace("__COMPOSER__", chart["meta"].get("composer", ""))
-               .replace("__LYRICIST__", chart["meta"].get("lyricist", "")))
-    for tag in ("__SONG_DATA__", "__AUDIO__", "__PLATFORM_CSS__", "__PLATFORM_JS__"):
-        assert tag not in html, "占位符未替换: " + tag
+    chart_json = json.dumps(chart_raw, ensure_ascii=False, separators=(",", ":"))
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
+    # ---------- 1) 单文件版 ----------
+    single = render(tpl, chart_json, plat_css, plat_js, "data:audio/mpeg;base64," + b64)
+    single = (single.replace("__COMPOSER__", chart_raw["meta"].get("composer", ""))
+                    .replace("__LYRICIST__", chart_raw["meta"].get("lyricist", "")))
     with open(OUT, "w", encoding="utf-8") as f:
-        f.write(html)
-    print(f"OK  {OUT}  {os.path.getsize(OUT)/1024/1024:.2f} MB")
-    # 参考：分离资源版（可选，便于后续替换音轨）
+        f.write(single)
+    print("OK  单文件  %s  %.2f MB" % (OUT, os.path.getsize(OUT) / 1024 / 1024))
+
+    # ---------- 2) 分包版（Toy 用） ----------
+    if os.path.isdir(DIST):
+        shutil.rmtree(DIST)
+    os.makedirs(DIST, exist_ok=True)
+    split = render(tpl, chart_json, plat_css, plat_js, "song.mp3")
+    split = (split.replace("__COMPOSER__", chart_raw["meta"].get("composer", ""))
+                  .replace("__LYRICIST__", chart_raw["meta"].get("lyricist", "")))
+    with open(os.path.join(DIST, "index.html"), "w", encoding="utf-8") as f:
+        f.write(split)
+    shutil.copyfile(mp3, os.path.join(DIST, "song.mp3"))
+    size_html = os.path.getsize(os.path.join(DIST, "index.html"))
+    size_mp3 = os.path.getsize(os.path.join(DIST, "song.mp3"))
+    print("OK  分包     dist/index.html  %.1f KB   dist/song.mp3  %.2f MB"
+          % (size_html / 1024, size_mp3 / 1024 / 1024))
+    if size_html > 1024 * 1024:
+        print("!! dist/index.html 超过 1MB，Toy 会拒收", file=sys.stderr)
+
+    # 参考：分离资源版（便于替换音轨）
     os.makedirs(os.path.join(ROOT, "audio"), exist_ok=True)
-    with open(os.path.join(ROOT, "audio", "song.mp3"), "wb") as f:
-        f.write(open(mp3, "rb").read())
+    shutil.copyfile(mp3, os.path.join(ROOT, "audio", "song.mp3"))
 
 
 if __name__ == "__main__":

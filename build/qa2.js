@@ -5,7 +5,7 @@ const path = require('path');
 
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 const PORT = 9441;
-const PAGE = 'file:///' + path.resolve(__dirname, '..', 'index.html').replace(/\\/g, '/');
+const PAGE = process.env.PAGE_URL || ('file:///' + path.resolve(__dirname, '..', 'index.html').replace(/\\/g, '/'));
 const PROF = path.join(require('os').tmpdir(), 'qcqa2_' + Date.now());
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -14,7 +14,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const edge = spawn(EDGE, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     '--remote-debugging-port=' + PORT, '--user-data-dir=' + PROF,
-    '--allow-file-access-from-files', '--mute-audio',
+    '--allow-file-access-from-files', '--mute-audio', '--no-proxy-server', '--proxy-bypass-list=*',
     '--window-size=1280,860', PAGE
   ], { stdio: 'ignore' });
 

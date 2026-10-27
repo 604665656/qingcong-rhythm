@@ -78,12 +78,15 @@ build/
 # 2) 分析音频、生成谱面（需要 numpy，ffmpeg 可用 FFMPEG_EXE 指定）
 python build/analyze.py 你的音频.m4a 你的歌词.lrc build
 
-# 3) 注入模板，产出单文件
+# 3) 注入模板，产出两份
 python build/build.py
-# → index.html
+# → index.html        单文件版 3.9MB，音轨内嵌，双击即玩 / 适合 itch.io
+# → dist/             分包版 index.html 142KB + song.mp3 2.8MB，适合 B站 Toy
 ```
 
-`build.py` 会依次替换模板里的 `__SONG_DATA__` / `__AUDIO__` / `__PLATFORM_CSS__` / `__PLATFORM_JS__` 占位符，并断言四个占位符都被替换干净。
+为什么要有两份：B 站 Toy 限制 **`index.html` 解压后 ≤ 1MB**，内嵌 base64 音轨会直接超限被拒（提示「请将内联的脚本、样式或图片拆成独立文件」）。分包版把音轨改成相对路径 `song.mp3`，正文只有 142KB。
+
+`build.py` 会替换模板里的 `__SONG_DATA__` / `__AUDIO__` / `__PLATFORM_CSS__` / `__PLATFORM_JS__` 占位符，并断言四个都被替换干净。`__AUDIO__` 既可以是 `data:audio/mpeg;base64,...`，也可以是 `song.mp3` 这样的相对路径，前端两种都支持。
 
 ### 自测
 
