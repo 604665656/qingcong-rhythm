@@ -467,7 +467,7 @@ __PLATFORM_CSS__
         <div class="diffs" id="diffs"></div>
         <div class="title-actions">
           <button class="btn" id="startBtn">开始游戏</button>
-          <button class="btn ghost" id="modesBtn">模式：下落</button>
+          <button class="btn ghost" id="modesBtn">模式：节奏</button>
           <button class="btn ghost" id="dressBtn">装扮</button>
           <button class="btn ghost" id="settingBtn">设置</button>
           <button class="btn ghost" id="helpBtn">玩法</button>
@@ -1011,9 +1011,10 @@ const DIFFS = [
   {id:'normal', name:'NORMAL', cn:'心动', stars:'★★★☆', color:'#ffd166'},
   {id:'hard',   name:'HARD',   cn:'青春', stars:'★★★★★', color:'#ff9ec7'}
 ];
-/* 玩法模式：下落式（经典四轨） / 太鼓（横向 don-ka） */
+/* 玩法模式：节奏（经典四轨下落） / 太鼓（横向 don-ka）
+   注意：对外统一叫「节奏」（与排行榜 MODE_CN.classic 一致），别再写成「下落」 */
 const MODES = [
-  {id:'classic', name:'下落',  en:'Falling', hint:'四轨下落 · D F J K'},
+  {id:'classic', name:'节奏',  en:'Rhythm',  hint:'四轨节奏 · D F J K'},
   {id:'taiko',   name:'太鼓',  en:'Taiko',   hint:'咚咔 · 红蓝两键'},
   // 预留榜位与入口：九宫格 / 连线（排行榜已按模式预留 3、4 号榜）
   {id:'grid9',   name:'九宫格', en:'Grid9',  hint:'3×3 九宫格 · 敬请期待', soon:true},
@@ -1039,7 +1040,7 @@ const S = {
 };
 let feverEver = false;    // 本局是否触发过 FEVER（用于成就）
 const store = {
-  // 榜单按模式分，本机最佳也按「模式 + 难度」记，避免太鼓分和下落分混在一起
+  // 榜单按模式分，本机最佳也按「模式 + 难度」记，避免太鼓分和节奏分混在一起
   get k(){ return 'qc_rhythm_v1_' + (S.mode||'classic') + '_' + S.diff; },
   get legacy(){ return 'qc_rhythm_v1_' + S.diff; },
   best(){
@@ -1982,7 +1983,7 @@ function pressLane(lane, ts){
     judge(lane, ts);
   }
 }
-/* 输入分发：下落模式按轨道判，太鼓模式按 don/ka 判（lane 0/1→咚，2/3→咔） */
+/* 输入分发：节奏模式按轨道判，太鼓模式按 don/ka 判（lane 0/1→咚，2/3→咔） */
 function pressDisp(lane, ts){
   if(S.mode==='taiko'){
     if(S.screen==='game' && !S.paused){

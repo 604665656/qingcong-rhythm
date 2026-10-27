@@ -405,7 +405,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     'soon=' + lb.soon.join('、'));
   T('模式循环只在已实现模式间进行', lb.playable.length === 2 && lb.playable.join(',') === 'classic,taiko',
     'playable=' + lb.playable.join(','));
-  T('本机最佳分按模式分开存（太鼓不混下落）', lb.k1 !== lb.k2 && /taiko/.test(lb.k2), 'k1=' + lb.k1 + ' k2=' + lb.k2);
+  T('本机最佳分按模式分开存（太鼓不混节奏）', lb.k1 !== lb.k2 && /taiko/.test(lb.k2), 'k1=' + lb.k1 + ' k2=' + lb.k2);
+
+  // 模式对外统一叫「节奏」，与排行榜 MODE_CN.classic 保持一致（别再写成「下落」）
+  const mn1 = await ev(`(function(){
+    try{
+      var old = S.mode;
+      S.mode='classic'; applyMode();
+      var t1 = document.getElementById('modesBtn').textContent;
+      var cn = (window.PLAT && window.PLAT.MODE_CN) ? window.PLAT.MODE_CN.classic : '';
+      S.mode = old; applyMode();
+      return JSON.stringify({t1:t1, cn:cn});
+    }catch(e){ return 'ERR:'+e.message; }
+  })()`);
+  const mn = J(mn1, 'mn');
+  T('模式按钮显示「节奏」而非「下落」', /节奏/.test(mn.t1) && !/下落/.test(mn.t1), 'btn=' + mn.t1);
+  T('模式名与排行榜榜名一致', mn.cn === '节奏' && /节奏/.test(mn.t1), 'rank=' + mn.cn + ' btn=' + mn.t1);
 
   const lb2 = await ev(`(function(){
     try{

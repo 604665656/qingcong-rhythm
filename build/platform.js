@@ -80,6 +80,17 @@
 
   /* ------------------------------------------------------------- SDK 接入 */
   /* 所有 SDK 调用都必须带超时：非宿主环境里部分能力返回的 Promise 永不 settle */
+  /* 云存档 / 排行榜走 Toy 共享额度，超限会 reject 307044。
+     这类失败「发布时一切正常，玩家一多才爆」，预览页看不出来。
+     不加区分地立即重试只会继续打满额度，所以退避一段时间，窗口内直接跳过。 */
+  var QUOTA_CODE = '307044';
+  var QUOTA_BACKOFF_MS = 60000;
+  function isQuotaErr(e) {
+    var s = String((e && (e.code != null ? e.code : e.message)) || e || '');
+    return s.indexOf(QUOTA_CODE) >= 0;
+  }
+  function quotaBlocked() { return Date.now() < (P.rateLimitedUntil || 0); }
+
   function TO(p, ms, tag) {
     return new Promise(function (resolve, reject) {
       var done = false;
@@ -90,7 +101,15 @@
       Promise.resolve(p).then(function (v) {
         if (done) return; done = true; clearTimeout(t); resolve(v);
       }, function (e) {
-        if (done) return; done = true; clearTimeout(t); reject(e);
+        if (done) return; done = true; clearTimeout(t);
+        if (isQuotaErr(e)) {
+          P.rateLimitedUntil = Date.now() + QUOTA_BACKOFF_MS;
+          if (!P.quotaNoticed) {
+            P.quotaNoticed = true;
+            try { toast('当前体验人数较多，排行榜/存档稍后自动恢复', 'err'); } catch (_) {}
+          }
+        }
+        reject(e);
       });
     });
   }
@@ -184,6 +203,7 @@
   }
   async function flushCloud() {
     if (!P.sdk) return;
+    if (quotaBlocked()) return;          // 限流窗口内不写云端，脏标记保留到下次再试
     var payload = {};
     if (dirty.best) payload[CFG.KV.best] = JSON.stringify(P.best);
     if (dirty.set) payload[CFG.KV.set] = JSON.stringify(P.set);
@@ -378,6 +398,12 @@
     rankState.loading = true;
     list.innerHTML = '<div class="rank-empty">载入中…</div>';
     var board = MODE_BOARD[rankState.mode] || 1;
+
+    /* 刚被共享额度限流过：窗口内别再打云端，直接展示本机成绩 */
+    if (quotaBlocked()) {
+      renderLocalRank('当前体验人数较多，榜单稍后自动恢复（本机成绩不受影响）。');
+      return;
+    }
 
     /* 没有宿主身份就不要去打扰云端，直接展示本机成绩 */
     if (!P.sdk || !P.user) {
@@ -656,6 +682,7 @@
 
     // 排行榜提交
     if (!P.sdk) return;
+    if (quotaBlocked()) return;          // 限流窗口内跳过上传，成绩仍在本地
     if (Date.now() - P.lastSubmit < CFG.SUBMIT_MIN_INTERVAL_MS) {
       console.warn('[submit] 提交过于频繁，已跳过本次上传');
       return;
