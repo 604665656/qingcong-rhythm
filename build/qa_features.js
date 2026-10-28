@@ -113,19 +113,22 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const tk1 = await ev(`JSON.stringify({
     hasTaiko: MODES.some(m=>m.id==='taiko'),
     win: (typeof TAIKO_WIN!=='undefined')?TAIKO_WIN:{},
-    modesBtn: (document.getElementById('modesBtn')||{}).textContent||''
+    modeCards: (document.getElementById('modes')||{children:[]}).children.length,
+    modeSel: (document.querySelector('#modes .mode.sel .mn')||{}).textContent||''
   })`);
   const tk = J(tk1, 'tk');
   T('模式列表含太鼓', tk.hasTaiko);
+  T('模式卡片已渲染（4 张：节奏/太鼓/九宫格/连线）', tk.modeCards === 4, 'cards=' + tk.modeCards);
+  T('模式卡片默认高亮「节奏」', tk.modeSel === '节奏', 'sel=' + tk.modeSel);
   T('太鼓判定窗口存在（良/可/不可）', tk.win.GOOD>0 && tk.win.OK>0 && tk.win.MISS>0, JSON.stringify(tk.win));
   const tk2 = await ev(`(function(){
     S.mode='taiko'; applyMode();
     var arr = taikoFor('easy');
     var don = arr.filter(n=>n.type==='don').length, ka = arr.filter(n=>n.type==='ka').length;
-    return JSON.stringify({btn:document.getElementById('modesBtn').textContent, total:arr.length, don:don, ka:ka});
+    return JSON.stringify({sel:(document.querySelector('#modes .mode.sel .mn')||{}).textContent||'', total:arr.length, don:don, ka:ka});
   })()`);
   const tk2v = J(tk2, 'tk2');
-  T('applyMode 文案含「太鼓」', /太鼓/.test(tk2v.btn), tk2v.btn);
+  T('applyMode 切换后高亮「太鼓」', tk2v.sel === '太鼓', tk2v.sel);
   T('太鼓谱由四轨派生（咚/咔均有）', tk2v.total>0 && tk2v.don>0 && tk2v.ka>0, `total=${tk2v.total} don=${tk2v.don} ka=${tk2v.ka}`);
   // 太鼓判定 + 魂槽不抛错，且命中可加魂
   const tk3 = await ev(`(function(){
@@ -412,15 +415,44 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     try{
       var old = S.mode;
       S.mode='classic'; applyMode();
-      var t1 = document.getElementById('modesBtn').textContent;
+      var t1 = (document.querySelector('#modes .mode.sel .mn')||{}).textContent||'';
       var cn = (window.PLAT && window.PLAT.MODE_CN) ? window.PLAT.MODE_CN.classic : '';
       S.mode = old; applyMode();
       return JSON.stringify({t1:t1, cn:cn});
     }catch(e){ return 'ERR:'+e.message; }
   })()`);
   const mn = J(mn1, 'mn');
-  T('模式按钮显示「节奏」而非「下落」', /节奏/.test(mn.t1) && !/下落/.test(mn.t1), 'btn=' + mn.t1);
-  T('模式名与排行榜榜名一致', mn.cn === '节奏' && /节奏/.test(mn.t1), 'rank=' + mn.cn + ' btn=' + mn.t1);
+  T('模式卡片显示「节奏」而非「下落」', /节奏/.test(mn.t1) && !/下落/.test(mn.t1), 'sel=' + mn.t1);
+  T('模式名与排行榜榜名一致', mn.cn === '节奏' && /节奏/.test(mn.t1), 'rank=' + mn.cn + ' sel=' + mn.t1);
+
+  // 弹窗可滚动：面板与 sheet 容器 overflow-y 应为 auto（排行榜/装扮在矮屏可自由上下滑动）
+  const sc1 = await ev(`(function(){
+    var cs = function(el){ return el ? getComputedStyle(el).overflowY : 'none'; };
+    return JSON.stringify({panel:cs(document.querySelector('.panel')), sheet:cs(document.querySelector('.sheet'))});
+  })()`);
+  const sc = J(sc1, 'sc');
+  T('面板容器可滚动（overflow-y=auto）', sc.panel === 'auto', 'panel=' + sc.panel);
+  T('排行榜/体力 sheet 可滚动', sc.sheet === 'auto', 'sheet=' + sc.sheet);
+
+  // 「更多游戏」入口：跳转到 Toy 站内首页（寻找更多游戏）
+  const mg1 = await ev(`(function(){
+    var a1 = document.getElementById('moreGamesBtn');
+    var a2 = document.getElementById('moreGamesBtn2');
+    return JSON.stringify({title: !!a1, result: !!a2, href: (a1&&a1.href)||''});
+  })()`);
+  const mg = J(mg1, 'mg');
+  T('标题页有「更多游戏」入口', mg.title, 'href=' + mg.href);
+  T('结算页有「发现更多游戏」入口', mg.result);
+  T('更多游戏跳转 Toy 站内首页', /bilibili\.com\/toy/.test(mg.href), mg.href);
+
+  // 首次进入引导条存在（非遮挡、可关）
+  const co1 = await ev(`(function(){
+    var c = document.getElementById('coach');
+    var x = document.getElementById('coachClose');
+    return JSON.stringify({exists:!!c, close:!!x});
+  })()`);
+  const co = J(co1, 'co');
+  T('首次进入引导条存在', co.exists && co.close);
 
   const lb2 = await ev(`(function(){
     try{

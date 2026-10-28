@@ -126,6 +126,27 @@
   .diff .cnt{position:absolute;right:12px;top:14px;font-size:9.5px;color:var(--txt-dim);letter-spacing:.04em;white-space:nowrap;opacity:.85;}
   .title-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
   .best{font-size:12px;color:var(--txt-dim);letter-spacing:.06em;}
+  /* 模式选择卡片（显式可视化，当前模式高亮） */
+  .modes{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+  .mode{
+    flex:1 1 0;min-width:96px;cursor:pointer;padding:12px 14px;border-radius:14px;text-align:center;
+    background:linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+    border:1px solid rgba(255,255,255,.1);transition:.2s;position:relative;
+  }
+  .mode:hover{border-color:rgba(255,255,255,.28);transform:translateY(-2px);}
+  .mode.sel{background:linear-gradient(160deg, rgba(255,209,102,.22), rgba(255,158,199,.14));border-color:rgba(255,209,102,.65);box-shadow:0 12px 30px rgba(255,158,199,.18), inset 0 0 0 1px rgba(255,255,255,.14);}
+  .mode .mn{font-size:15px;font-weight:800;letter-spacing:.08em;}
+  .mode .ms{font-size:10.5px;color:var(--txt-dim);letter-spacing:.04em;margin-top:3px;}
+  .mode.soon{cursor:not-allowed;opacity:.5;transform:none;}
+  .mode.soon .mn::after{content:" · 敬请期待";font-size:9px;color:var(--amber);letter-spacing:.02em;}
+  .modes-label{font-size:11px;color:var(--txt-dim);letter-spacing:.2em;margin:0 0 8px;}
+  /* 首次进入引导条（非遮挡，内容始终可见，可关） */
+  .coach{display:none;align-items:flex-start;gap:10px;margin:0 0 16px;padding:12px 14px;border-radius:14px;
+    background:linear-gradient(135deg, rgba(66,232,208,.14), rgba(255,158,199,.12));border:1px solid rgba(255,209,102,.4);font-size:12.5px;line-height:1.7;color:#fdeaff;}
+  .coach.on{display:flex;}
+  .coach .ci{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:rgba(255,209,102,.25);color:#ffe6a8;font-style:italic;font-weight:800;font-family:Georgia,serif;font-size:14px;margin-top:1px;}
+  .coach .cx{margin-left:auto;flex:0 0 auto;cursor:pointer;color:var(--txt-dim);font-size:18px;line-height:1;padding:0 2px;}
+  .coach b{color:#ffe6a8;font-weight:800;}
   /* 选曲条 */
   .songs{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
   .song{cursor:pointer;padding:8px 16px;border-radius:999px;font-size:13px;font-weight:600;letter-spacing:.04em;
@@ -272,7 +293,7 @@
   /* ---------------- 遮罩/弹层 ---------------- */
   .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,5,12,.72);backdrop-filter:blur(10px);z-index:20;}
   .overlay.on{display:flex;}
-  .panel{width:min(92vw,420px);border-radius:24px;padding:26px 26px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6);position:relative;}
+  .panel{width:min(92vw,420px);border-radius:24px;padding:26px 26px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6);position:relative;max-height:calc(100dvh - 32px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
   /* 面板右上角关闭 ✕：装扮页很长，底部按钮要滚动才够得着，必须给顶部关闭入口 */
   .panel>.sheet-close{position:absolute;top:12px;right:12px;z-index:6;}
   .panel h3{margin:0 0 18px;font-size:17px;letter-spacing:.14em;font-weight:800;}
@@ -428,7 +449,7 @@
     .res-cell .v{font-size:12px;}
     .res-actions .btn{padding:9px 0;font-size:11.5px;}
     /* 弹层 */
-    .sheet{max-height:94vh;padding:14px 16px 12px;}
+    .sheet{max-height:94vh;padding:14px 16px 12px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
     .sheet-title{font-size:13px;}
     .sheet-title small{font-size:8.5px;margin-top:2px;}
   }
@@ -463,15 +484,22 @@ __PLATFORM_CSS__
           <span>BPM <b id="bpmLbl">--</b></span>
           <span>时长 <b id="durLbl">--:--</b></span>
         </div>
+        <div class="coach" id="coach">
+          <span class="ci">i</span>
+          <span>第一次玩？先选<b>模式</b>与<b>难度</b>，再点<b>开始游戏</b>。音符落到判定线时按 <b>D F J K</b>（或触屏点对应轨道）。想看详细操作点<b>玩法</b>。</span>
+          <span class="cx" id="coachClose" title="不再显示">✕</span>
+        </div>
         <div class="songs" id="songs"></div>
         <div class="diffs" id="diffs"></div>
+        <div class="modes-label">模式</div>
+        <div class="modes" id="modes"></div>
         <div class="title-actions">
           <button class="btn" id="startBtn">开始游戏</button>
-          <button class="btn ghost" id="modesBtn">模式：节奏</button>
           <button class="btn ghost" id="dressBtn">装扮</button>
           <button class="btn ghost" id="settingBtn">设置</button>
           <button class="btn ghost" id="helpBtn">玩法</button>
           <button class="btn ghost" id="orientBtn">屏幕：自动</button>
+          <a class="btn ghost" id="moreGamesBtn" href="https://www.bilibili.com/toy" target="_blank" rel="noopener">更多游戏 ↗</a>
           <div class="best">最佳 <b id="bestLbl">—</b></div>
         </div>
       </div>
@@ -544,6 +572,9 @@ __PLATFORM_CSS__
       <div class="res-actions">
         <button class="btn" id="retryBtn">再来一次</button>
         <button class="btn ghost" id="backBtn" style="flex:.62">返回选曲</button>
+      </div>
+      <div style="margin-top:12px;text-align:center;">
+        <a class="btn ghost" id="moreGamesBtn2" href="https://www.bilibili.com/toy" target="_blank" rel="noopener" style="display:inline-flex;width:auto;padding:10px 22px;">发现更多游戏 ↗</a>
       </div>
     </div>
   </section>
@@ -2320,7 +2351,26 @@ function buildSongs(){
 }
 function applyMode(){
   const m = MODES.find(x=>x.id===S.mode) || MODES[0];
-  $('#modesBtn').textContent = '模式：' + m.name;
+  const wrap = $('#modes');
+  if(wrap) [...wrap.children].forEach(c=>c.classList.toggle('sel', c.dataset.id===m.id));
+}
+function buildModes(){
+  const wrap = $('#modes'); if(!wrap) return;
+  wrap.innerHTML = '';
+  MODES.forEach(m=>{
+    const el = document.createElement('div');
+    el.className = 'mode' + (m.id===S.mode?' sel':'') + (m.soon?' soon':'');
+    el.dataset.id = m.id;
+    el.innerHTML = '<div class="mn">'+m.name+'</div><div class="ms">'+m.en+'</div>';
+    el.onclick = ()=>{
+      if(m.soon){ toast(m.name + ' 敬请期待'); return; }
+      if(m.id===S.mode){ openModeInfo(); return; }
+      S.mode = m.id;
+      [...wrap.children].forEach(c=>c.classList.toggle('sel', c.dataset.id===m.id));
+      applyMode(); refreshBest();
+    };
+    wrap.appendChild(el);
+  });
 }
 
 /* ---------- 个性化主题 ---------- */
@@ -2546,14 +2596,6 @@ function bindSettings(){
   };
   bindPanelClose();
   applyOrient();
-  // 只在已实现的模式间循环（九宫格 / 连线是预留入口，选中会提示敬请期待）
-  $('#modesBtn').onclick = ()=>{
-    const list = playableModes();
-    const i = list.findIndex(m=>m.id===S.mode);
-    const next = list[((i<0?0:i)+1) % list.length];
-    if(MODES.find(m=>m.id===next.id).soon){ toast(next.name + ' 敬请期待'); return; }
-    S.mode = next.id; applyMode(); openModeInfo();
-  };
   $('#modeClose').onclick = ()=>{ $('#modeOverlay').classList.remove('on'); if(S.screen==='game' && S.paused && S.modePaused) resume(); };
   const sfxRange2=$('#sfxRange2');
   if(sfxRange2) sfxRange2.oninput = ()=>{ S.sfxVol=+sfxRange2.value/100; Sfx.setVol(S.sfxVol); const sr=$('#sfxRange'); if(sr) sr.value=sfxRange2.value; const sv=$('#sfxVal'); if(sv) sv.textContent=sfxRange2.value+'%'; };
@@ -2629,7 +2671,18 @@ function proceed(){
   $('#lyricistLbl').textContent = SONG.meta.lyricist || '—';
   $('#srcLbl').textContent = SONG.meta.source || '—';
   $('#resSong') && ($('#resSong').textContent = SONG.title || SONG.meta.title);
-  buildSongs(); buildDiffs(); applyMode(); refreshBest(); bindSettings();
+  buildSongs(); buildDiffs(); buildModes(); applyMode(); refreshBest(); bindSettings();
+  // 首次进入引导（一次性，非遮挡、内容可见、可关）
+  try{
+    if(!localStorage.getItem('qc_firstrun')){
+      const c = $('#coach');
+      if(c){
+        c.classList.add('on');
+        const x = $('#coachClose');
+        if(x) x.onclick = ()=>{ c.classList.remove('on'); try{ localStorage.setItem('qc_firstrun','1'); }catch(e){} };
+      }
+    }
+  }catch(e){}
   resize();
   raf = requestAnimationFrame(loop);
   setTimeout(()=> $('#loading').classList.add('off'), 320);
