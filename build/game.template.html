@@ -1096,7 +1096,7 @@ const pf = $('#playfield'), pctx = pf.getContext('2d');
 const fx = $('#fx'), fctx = fx.getContext('2d');
 
 /* ---------- 音频 ---------- */
-let actx=null, abuf=null, srcNode=null, gainNode=null, startAt=0, pausedAt=0;
+let actx=null, abuf=null, srcNode=null, gainNode=null, startAt=0, pausedAt=0, clockStart=0;
 let audioEl=null, audioMode='webaudio';
 function b64ToBuf(uri){
   const b64 = uri.slice(uri.indexOf(',')+1);
@@ -1222,36 +1222,42 @@ async function loadAudio(){
   }
 }
 function songTime(){
-  if(audioMode==='element') return (audioEl? audioEl.currentTime : 0) - S.offset/1000;
-  if(audioMode==='clock') return (S.playing ? nowSec() - startAt : pausedAt) - S.offset/1000;
-  if(!actx) return 0;
+  // 软时钟兜底：音频时钟（WebAudio / audio 元素）被环境（autoplay 限制 / 未 resume / CSP）卡住时，
+  // 用 performance.now() 推进，保证音符照常下落、游戏可玩；音频正常时仍优先用音频时钟保证音画同步。
+  const clock = (S.playing ? nowSec() - clockStart : pausedAt) - S.offset/1000;
+  if(audioMode==='clock') return clock;
+  if(audioMode==='element'){
+    if(audioEl && S.playing && !audioEl.paused && audioEl.readyState>=2) return audioEl.currentTime - S.offset/1000;
+    return clock;
+  }
+  if(!actx || actx.state!=='running') return clock;
   if(!S.playing) return pausedAt;
   return (actx.currentTime - startAt) - S.offset/1000;
 }
 function startAudio(from){
   from = Math.max(0, from);
+  clockStart = nowSec() - from;          // 软时钟起点（兜底，永不跳变）
   if(audioMode==='element'){
     audioEl.currentTime = from;
     const p = audioEl.play();
     if(p && p.catch) p.catch(()=>{});
-    S.playing = true; S.paused = false; pausedAt = from;
+    startAt = clockStart; S.playing = true; S.paused = false; pausedAt = from;
     return;
   }
   if(audioMode==='clock'){
-    startAt = nowSec() - from;
-    S.playing = true; S.paused = false; pausedAt = from;
+    startAt = clockStart; S.playing = true; S.paused = false; pausedAt = from;
     return;
   }
   if(srcNode){ try{ srcNode.stop(); }catch(e){} srcNode.disconnect(); }
   srcNode = actx.createBufferSource(); srcNode.buffer = abuf; srcNode.connect(gainNode);
   const t0 = actx.currentTime + 0.12;
   srcNode.start(t0, from);
-  startAt = t0 - from;
+  startAt = t0 - from;                    // 精确起点（音频正常时 songTime 用此）
   S.playing = true; S.paused = false;
 }
 function stopAudio(){
   if(audioMode==='element'){ try{ audioEl.pause(); }catch(e){} S.playing=false; return; }
-  if(audioMode==='clock'){ pausedAt = nowSec() - startAt; S.playing = false; return; }
+  if(audioMode==='clock'){ pausedAt = nowSec() - clockStart; S.playing = false; return; }
   if(srcNode){ try{ srcNode.stop(); }catch(e){} srcNode.disconnect(); srcNode=null; }
   S.playing = false;
 }
@@ -2192,7 +2198,10 @@ function setScreen(name){
   ({title:titleScreen, game:gameScreen, result:resultScreen})[name].classList.add('on');
 }
 function start(){
-  if(!abuf && !audioEl && audioMode!=='clock') return;
+  if(audioMode!=='clock' && !abuf && !audioEl){
+    // 没有可用音频资源（加载失败/被环境拦截）：自动降级到软时钟试玩，不让游戏卡死
+    audioMode = 'clock';
+  }
   if(typeof window.__beforeStart === 'function' && window.__beforeStart() === false) return;
   unlockAudio();
   if(S.mode==='taiko'){
@@ -2615,27 +2624,12 @@ function bindSettings(){
 /* ---------- 启动 ---------- */
 /* 音轨彻底失败时的兜底面板：重试 / 静音试玩（用 performance 时钟走谱面） */
 function bootFail(err){
-  const box = $('#loading');
-  if(!box) return;
-  box.classList.remove('off');
-  $('#loadTxt').textContent = '音轨载入失败';
-  let tip = $('#loadErr');
-  if(!tip){
-    tip = document.createElement('div');
-    tip.id = 'loadErr'; tip.className = 'load-err';
-    box.appendChild(tip);
-  }
-  tip.innerHTML = '<div class="le-msg">' + ((err && err.message) || '未知错误') + '</div>'
-    + '<div class="le-tip">iOS / Safari 打开本地 HTML 时可能禁止读取音频。<br/>可先"静音试玩"（节拍仍按音轨时间轴走），或把文件放到 http 服务下再打开。</div>'
-    + '<div class="le-acts"><button class="btn" id="loadRetry">重试</button>'
-    + '<button class="btn ghost" id="loadSkip">静音试玩</button></div>';
-  $('#loadRetry').onclick = ()=> location.reload();
-  $('#loadSkip').onclick = ()=>{
-    audioMode = 'clock';
-    S.dur = SONG.meta.duration;
-    tip.remove();
-    proceed();
-  };
+  // 音轨彻底不可用（加载失败 / 被环境拦截）：自动降级到软时钟试玩，保证游戏能进入、能玩，只是没有背景音乐
+  audioMode = 'clock';
+  S.dur = SONG.meta.duration;
+  try{ console.warn('[audio] bootFail，自动静音试玩：', (err && err.message) || err); }catch(e){}
+  proceed();
+  try{ toast('未能载入背景音乐，已切换为静音试玩（节拍与判定照常进行）。刷新页面可重试载入音乐', 9000); }catch(e){}
 }
 
 async function boot(){
