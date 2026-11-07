@@ -469,6 +469,7 @@ __PLATFORM_CSS__
   <canvas id="fx"></canvas>
   <div class="bg bg-vign"></div>
   <div class="hitflash"></div>
+  <div id="bgStage"></div>
 
   <!-- ================= 标题页 ================= -->
   <section class="screen on" id="titleScreen">
@@ -497,6 +498,7 @@ __PLATFORM_CSS__
           <button class="btn" id="startBtn">开始游戏</button>
           <button class="btn ghost" id="dressBtn">装扮</button>
           <button class="btn ghost" id="settingBtn">设置</button>
+          <button class="btn ghost" id="freeBtn">自由模式</button>
           <button class="btn ghost" id="helpBtn">玩法</button>
           <button class="btn ghost" id="orientBtn">屏幕：自动</button>
           <a class="btn ghost" id="moreGamesBtn" href="https://www.bilibili.com/toy" target="_blank" rel="noopener">更多游戏 ↗</a>
@@ -692,6 +694,52 @@ __PLATFORM_CSS__
       <div class="mode-hint" id="modeHint"></div>
       <div class="mode-how" id="modeHow"></div>
       <div class="panel-actions"><button class="btn ghost" id="modeClose" style="flex:1">知道了，开始玩</button></div>
+    </div>
+  </div>
+
+  <!-- ================= 自定义工坊 / 自由模式 ================= -->
+  <style>
+    #bgStage{position:fixed;inset:0;z-index:0;display:none;overflow:hidden;background:#0a0814;}
+    #bgStage .bg-slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.2s ease;}
+    #bgStage .bg-slide.on{opacity:1;}
+    .free-status{font-size:12px;color:var(--mint);}
+    #freeOverlay textarea{width:100%;margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);color:var(--txt);font-family:inherit;font-size:12px;resize:vertical;box-sizing:border-box;}
+    #freeOverlay input[type=file]{color:var(--txt-dim);font-size:12px;max-width:100%;}
+    #freeOverlay input[type=color]{width:42px;height:28px;border:none;background:none;cursor:pointer;vertical-align:middle;}
+  </style>
+  <div class="overlay" id="freeOverlay">
+    <div class="panel glass" style="max-width:min(94vw,720px);">
+      <button class="sheet-close" id="freeClose" title="关闭">✕</button>
+      <h3>自定义工坊 · 自由模式</h3>
+      <div class="note">导入你自己的谱面 + 音频 + 背景 + 判定音，做一首专属演奏。所有内容只存在本机，不会上传；自由模式会自动关闭歌词与品牌联动。网易云 / 酷狗 / 汽水 / QQ 的分享链接无法直接读取（需鉴权且非直链），建议用本地文件，或填你自己托管的可外链 mp3。</div>
+      <div class="dress-section"><label>① 谱面（支持 NoteLine 格式与原生格式，自动识别）</label>
+        <div class="row"><input type="file" id="freeChartFile" accept=".json,application/json" /></div>
+        <textarea id="freeChartText" rows="3" placeholder="在此粘贴谱面 JSON，或选文件后点「解析 / 转换」"></textarea>
+        <div class="row"><button class="btn ghost mini" id="freeParse">解析 / 转换</button><span id="freeChartStatus" class="free-status"></span></div>
+      </div>
+      <div class="dress-section"><label>② 音频（本地文件离线可用；或填你自己的可外链 mp3 地址）</label>
+        <div class="row"><input type="file" id="freeAudioFile" accept="audio/*" /></div>
+        <div class="row"><input type="text" id="freeAudioUrl" placeholder="https://你的CDN/歌曲.mp3（需允许跨域）" style="flex:1;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);color:var(--txt);" /></div>
+        <div class="row"><span id="freeAudioStatus" class="free-status"></span></div>
+      </div>
+      <div class="dress-section"><label>③ 背景图（游玩时轮播，多张更佳）</label>
+        <div class="row"><input type="file" id="freeBgFiles" accept="image/*" multiple /></div>
+        <div class="row"><textarea id="freeBgUrls" rows="2" placeholder="每行一个图片地址（可选）"></textarea></div>
+        <div class="row"><span id="freeBgPrev" class="free-status"></span></div>
+      </div>
+      <div class="dress-section"><label>④ 判定音效（留空则用默认合成音）</label>
+        <div class="row"><input type="file" id="freeSfxFile" accept="audio/*" /></div>
+        <div class="row"><label style="font-size:12px;color:var(--txt-dim)">使用默认合成判定音</label><div class="switch on" id="freeSfxDefault"></div></div>
+        <div class="row"><span id="freeSfxStatus" class="free-status"></span></div>
+      </div>
+      <div class="dress-section"><label>⑤ 界面</label>
+        <div class="row"><label style="font-size:12px;color:var(--txt-dim)">主题强调色</label><input type="color" id="freeAccent" value="#ff9ec7" /></div>
+        <div class="row"><label style="font-size:12px;color:var(--txt-dim)">曲名（可选）</label><input type="text" id="freeTitle" placeholder="自由演奏" style="flex:1;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);color:var(--txt);" /></div>
+      </div>
+      <div class="panel-actions">
+        <button class="btn ghost" id="freeSave">保存配置</button>
+        <button class="btn" id="freeStart">开始演奏</button>
+      </div>
     </div>
   </div>
 
@@ -1287,7 +1335,7 @@ const Sfx = (function(){
   let ac=null, master=null;
   // 默认 C 大调五声（detectTonic 会用真实歌曲覆盖）
   let scale=[261.63,293.66,329.63,392.00,440.00,523.25];
-  let enabled=true, vol=0.5;
+  let enabled=true, vol=0.5, customHit=null;
   function ensure(){
     if(ac) return ac;
     if(typeof actx!=='undefined' && actx && actx.state!=='closed'){
@@ -1335,6 +1383,7 @@ const Sfx = (function(){
   }
   function judge(j){
     if(!enabled) return;
+    if(customHit){ playHit(customHit, j); return; }   // 自定义判定音优先
     if(j==='PERFECT') tone(scale[5], 0.16, 0.22, 'triangle');     // 高八度，明亮
     else if(j==='GREAT') tone(scale[3], 0.15, 0.17, 'triangle');    // 纯五度
     else if(j==='GOOD') tone(scale[0], 0.14, 0.12, 'sine');         // 根音，最轻
@@ -1361,7 +1410,20 @@ const Sfx = (function(){
   }
   function setEnabled(v){ enabled=v; if(v) resume(); }
   function setVol(v){ vol=v; if(master) master.gain.value=v; }
-  return {init, judge, don, ka, setEnabled, setVol, resume, ensure};
+  function setCustomHit(b){ customHit = b || null; }
+  function decode(ab){
+    const a = ensure(); if(!a) return Promise.reject(new Error('no AudioContext'));
+    return new Promise((res,rej)=>{ try{ a.decodeAudioData(ab.slice(0), b=>res(b), e=>rej(e)); }catch(e){ rej(e); } });
+  }
+  // 自定义判定音：把用户音频解码成的 AudioBuffer 当作打击音，按判定等级微调音高
+  function playHit(buf, j){
+    const a = ensure(); if(!a || !buf) return;
+    const s = a.createBufferSource(); s.buffer = buf;
+    s.playbackRate.value = (j==='PERFECT') ? 1.0 : (j==='GREAT' ? 0.92 : 0.80);
+    const g = a.createGain(); g.gain.value = Math.min(1, (vol||0.5)*1.3);
+    s.connect(g); g.connect(master || a.destination); s.start(a.currentTime);
+  }
+  return {init, judge, don, ka, setEnabled, setVol, resume, ensure, setCustomHit, decode};
 })();
 
 /* ---------- 画布尺寸 ---------- */
@@ -2194,6 +2256,7 @@ addEventListener('gamepaddisconnected', ()=>{ PAD.on = false; padBadge(''); });
 function setScreen(name){
   S.screen = name;
   document.body.classList.toggle('gaming', name==='game');
+  if(name!=='game'){ const bs=document.getElementById('bgStage'); if(bs) bs.style.display='none'; }
   [titleScreen, gameScreen, resultScreen].forEach(el=>el.classList.remove('on'));
   ({title:titleScreen, game:gameScreen, result:resultScreen})[name].classList.add('on');
 }
@@ -2621,6 +2684,211 @@ function bindSettings(){
   };
 }
 
+/* ===================== 自由模式 / 自定义工坊 ===================== */
+/* 参考开源 NoteLine 的思路：玩家可导入自己的谱面与音频，做成一个独立的「自由演奏」入口。
+   - 谱面支持 NoteLine 原生格式 {"0":{"0":{"start":毫秒}}} 与青葱原生格式 [[t,lane,hold]]，自动识别；
+   - 音频 / 背景图 / 判定音效 均支持「本地文件转 data: URI」，离线可用、零 CORS 问题；也可填自己托管的可外链 mp3；
+   - 自由模式自动关闭歌词与品牌联动，不污染主玩法。 */
+const FREE_KEY = 'qc_free_cfg';
+let _freeCharts=null, _freeAudio='', _freeBg=[], _freeSfx=undefined, _freeAccent='', _freeTitle='自由演奏', _freeDur=0;
+let _bgTimer=null, _bgIdx=0;
+
+/* NoteLine 格式 → 青葱 [t秒, lane, hold秒]（毫秒转秒、4 轨、跳过 "end" 结束标记） */
+function convNoteLine(nl){
+  if(!nl || typeof nl!=='object') return [];
+  const out = [];
+  for(let L=0; L<4; L++){
+    const arr = nl[String(L)] || nl[L];
+    if(!arr || typeof arr!=='object') continue;
+    const keys = Object.keys(arr)
+      .filter(k => arr[k] && arr[k].start!=='end' && typeof arr[k].start==='number')
+      .map(k=>+k).sort((a,b)=>a-b);
+    for(const k of keys){
+      const ms = +arr[String(k)].start;
+      out.push([ +(ms/1000).toFixed(3), L, 0 ]);
+    }
+  }
+  return out.sort((a,b)=>a[0]-b[0]);
+}
+/* 青葱原生格式 [[t,lane,hold]] → 规整化 */
+function convNative(arr){
+  if(!Array.isArray(arr)) return [];
+  return arr.map(n => (Array.isArray(n) ? [+n[0], +n[1], +(n[2]||0)] : null))
+            .filter(n => n && isFinite(n[0]) && n[1]>=0 && n[1]<4)
+            .sort((a,b)=>a[0]-b[0]);
+}
+/* 解析用户导入的谱面文本（自动识别格式） */
+function parseChartText(txt){
+  const obj = JSON.parse(txt);
+  let notes;
+  const isNL = obj && typeof obj==='object' && !Array.isArray(obj) &&
+               (obj['0']||obj['1']||obj['2']||obj['3']);
+  if(isNL){ notes = convNoteLine(obj); }
+  else if(Array.isArray(obj)){ notes = convNative(obj); }
+  else if(obj && obj.charts){ notes = convNative(obj.charts.normal || obj.charts[0]); }
+  else { throw new Error('无法识别的谱面格式（需 NoteLine 或青葱格式）'); }
+  if(!notes.length) throw new Error('谱面没有可用音符');
+  return {easy:notes, normal:notes, hard:notes, count:notes.length};
+}
+/* 构建自定义 SONG 对象 */
+function buildFreeSong(cfg){
+  const charts = cfg.charts || {easy:[],normal:[],hard:[]};
+  const n = charts.normal || [];
+  const last = n.length ? n[n.length-1][0] : 0;
+  const dur = (cfg.duration && cfg.duration>0) ? cfg.duration : (last + 6);
+  return {
+    id:'__free__', title: cfg.title || '自由演奏',
+    meta:{ title: cfg.title || '自由演奏', composer:'自定义', lyricist:'—',
+           bpm: cfg.bpm||0, duration: dur, offset:0, source:'自定义' },
+    charts:{ easy:charts.easy||[], normal:n, hard:charts.hard||[] },
+    accents: cfg.accents || [], lyrics:[], audio: cfg.audio || ''
+  };
+}
+/* 背景图片瀑布（轮播 data URI / 地址） */
+function applyFreeBg(imgs){
+  const stage = document.getElementById('bgStage');
+  if(!stage) return;
+  if(!imgs || !imgs.length){
+    stage.style.display='none';
+    if(_bgTimer){ clearInterval(_bgTimer); _bgTimer=null; }
+    if(S) S.bgImages=[];
+    return;
+  }
+  if(S) S.bgImages = imgs;
+  stage.innerHTML='';
+  imgs.forEach(src => {
+    const d = document.createElement('div');
+    d.className='bg-slide';
+    d.style.backgroundImage = 'url("' + (src||'').replace(/"/g,'%22') + '")';
+    stage.appendChild(d);
+  });
+  _bgIdx = 0;
+  const slides = stage.children;
+  const show = () => {
+    for(let i=0;i<slides.length;i++) slides[i].classList.toggle('on', i===_bgIdx);
+    _bgIdx = (++_bgIdx) % slides.length;
+  };
+  show();
+  if(_bgTimer) clearInterval(_bgTimer);
+  _bgTimer = setInterval(show, 4500);
+  stage.style.display='block';
+}
+/* 自定义判定音效（data URI / 地址 / File，解码成 AudioBuffer） */
+function applyFreeSfx(sfx){
+  Sfx.setCustomHit(null);
+  if(!sfx) return;
+  (async () => {
+    try{
+      let buf;
+      if(sfx instanceof File || sfx instanceof Blob){
+        buf = await Sfx.decode(await sfx.arrayBuffer());
+      } else {
+        const res = await fetch(sfx);
+        buf = await Sfx.decode(await res.arrayBuffer());
+      }
+      Sfx.setCustomHit(buf);
+    }catch(e){ console.warn('[free] 自定义判定音解码失败，沿用默认', e); }
+  })();
+}
+/* 自定义强调色（仅改主题三色，不影响玩法） */
+function applyFreeAccent(hex){
+  if(!hex) return;
+  const c = (hex||'').replace('#','');
+  if(c.length!==6) return;
+  const r=parseInt(c.slice(0,2),16), g=parseInt(c.slice(2,4),16), b=parseInt(c.slice(4,6),16);
+  const tint=f=> 'rgb('+Math.min(255,Math.round(r*f+(1-f)*255))+','+Math.min(255,Math.round(g*f+(1-f)*255))+','+Math.min(255,Math.round(b*f+(1-f)*255))+')';
+  const r1=document.documentElement.style;
+  r1.setProperty('--mint', tint(0.55));
+  r1.setProperty('--amber', 'rgb('+r+','+g+','+b+')');
+  r1.setProperty('--pink', tint(0.42));
+}
+/* 启动自由模式 */
+async function startFreeMode(cfg){
+  if(!cfg || !cfg.charts || !cfg.charts.normal || !cfg.charts.normal.length)
+    throw new Error('请先在工坊里导入谱面');
+  SONG = buildFreeSong(cfg);
+  AUDIO_SRC = SONG.audio || '';          // 空 = 静音试玩（时钟模式）
+  S.songIdx = -1; S.mode='classic'; S.diff='normal';
+  try{
+    document.getElementById('composerLbl').textContent='自定义';
+    document.getElementById('lyricistLbl').textContent='—';
+    document.getElementById('srcLbl').textContent='自定义';
+    document.getElementById('bpmLbl').textContent='--';
+    document.getElementById('durLbl').textContent=fmtDur(SONG.meta.duration);
+    const rs=document.getElementById('resSong'); if(rs) rs.textContent=SONG.title;
+    const h1=document.getElementById('songTitleH1'); if(h1) h1.innerHTML=(SONG.title||'').replace(' ','<br/>');
+  }catch(e){}
+  applyFreeBg(cfg.bgImages||[]);
+  if(cfg.accent) applyFreeAccent(cfg.accent);
+  applyFreeSfx(cfg.sfx);
+  if(AUDIO_SRC && AUDIO_SRC!=='song.mp3'){
+    try{ await loadAudio(); S.loadedAudioFor=AUDIO_SRC; }
+    catch(e){ console.warn('[free] 音频载入失败，静音试玩', e); audioMode='clock'; }
+  }
+  try{ start(); }catch(e){ console.error('[free] start 失败', e); }
+}
+function saveFreeCfg(){
+  try{
+    localStorage.setItem(FREE_KEY, JSON.stringify({
+      charts:_freeCharts, audio:_freeAudio, bgImages:_freeBg, sfx:_freeSfx, accent:_freeAccent, title:_freeTitle
+    }));
+  }catch(e){ toast && toast('配置过大，未能保存到本地'); }
+}
+function loadFreeCfg(){
+  try{ const raw=localStorage.getItem(FREE_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+}
+function loadFreeUI(){
+  const c=loadFreeCfg(); if(!c) return;
+  _freeCharts=c.charts||null; _freeAudio=c.audio||''; _freeBg=c.bgImages||[]; _freeSfx=c.sfx; _freeAccent=c.accent||''; _freeTitle=c.title||'自由演奏';
+  const cs=document.getElementById('freeChartStatus'); if(cs) cs.textContent=(_freeCharts&&_freeCharts.normal&&_freeCharts.normal.length)?('✓ 已载入保存的谱面（'+_freeCharts.normal.length+' 音符）'):'';
+  const as=document.getElementById('freeAudioStatus'); if(as) as.textContent=_freeAudio?('✓ 已载入音频'):'';
+  const bs=document.getElementById('freeBgPrev'); if(bs) bs.textContent=(_freeBg&&_freeBg.length)?('✓ 已记录 '+_freeBg.length+' 张背景图'):'';
+  const ss=document.getElementById('freeSfxStatus'); if(ss) ss.textContent=((_freeSfx===null||_freeSfx===undefined)?'使用默认合成判定音':(_freeSfx?'✓ 已载入自定义判定音':''));
+  const ac=document.getElementById('freeAccent'); if(ac) ac.value=_freeAccent||'#ff9ec7';
+  const tt=document.getElementById('freeTitle'); if(tt) tt.value=_freeTitle||'自由演奏';
+  const du=document.getElementById('freeSfxDefault'); if(du) du.classList.toggle('on', (_freeSfx===null||_freeSfx===undefined));
+}
+/* 工坊面板交互绑定 */
+function bindFree(){
+  const ov=()=>document.getElementById('freeOverlay');
+  const open=()=>{ const o=ov(); if(o) o.classList.add('on'); loadFreeUI(); };
+  const close=()=>{ const o=ov(); if(o) o.classList.remove('on'); };
+  const fb=document.getElementById('freeBtn'); if(fb) fb.onclick=open;
+  const fc=document.getElementById('freeClose'); if(fc) fc.onclick=close;
+  const fcf=document.getElementById('freeChartFile');
+  if(fcf) fcf.onchange=()=>{ const f=fcf.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ const ta=document.getElementById('freeChartText'); if(ta) ta.value=rd.result; }; rd.readAsText(f); };
+  const parseBtn=document.getElementById('freeParse');
+  if(parseBtn) parseBtn.onclick=()=>{
+    const ta=document.getElementById('freeChartText'); const txt=ta?ta.value.trim():'';
+    const st=document.getElementById('freeChartStatus');
+    if(!txt){ if(st) st.textContent='请粘贴或选择谱面文件'; return; }
+    try{ const r=parseChartText(txt); _freeCharts=r; if(st) st.textContent='✓ 解析成功：'+r.count+' 个音符（已自动识别格式）'; }
+    catch(e){ _freeCharts=null; if(st) st.textContent='✗ '+e.message; }
+  };
+  const faf=document.getElementById('freeAudioFile');
+  if(faf) faf.onchange=()=>{ const f=faf.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ _freeAudio=rd.result; const st=document.getElementById('freeAudioStatus'); if(st) st.textContent='✓ 已载入本地音频（离线可用）'; }; rd.readAsDataURL(f); };
+  const fau=document.getElementById('freeAudioUrl');
+  if(fau) fau.onchange=()=>{ const v=(fau.value||'').trim(); if(v){ _freeAudio=v; const st=document.getElementById('freeAudioStatus'); if(st) st.textContent='✓ 已填外链地址（需你的 CDN 允许跨域）'; } };
+  const fbf=document.getElementById('freeBgFiles');
+  if(fbf) fbf.onchange=()=>{ const files=fbf.files; if(!files||!files.length) return; _freeBg=[]; let n=0; for(const f of files){ const rd=new FileReader(); rd.onload=()=>{ _freeBg.push(rd.result); if(++n===files.length){ const p=document.getElementById('freeBgPrev'); if(p) p.textContent='✓ 已载入 '+_freeBg.length+' 张背景图'; } }; rd.readAsDataURL(f); } };
+  const fbu=document.getElementById('freeBgUrls');
+  if(fbu) fbu.onchange=()=>{ const v=(fbu.value||'').trim(); if(!v) return; _freeBg=v.split('\n').map(s=>s.trim()).filter(Boolean); const p=document.getElementById('freeBgPrev'); if(p) p.textContent='✓ 已记录 '+_freeBg.length+' 张背景图地址'; };
+  const fsf=document.getElementById('freeSfxFile');
+  if(fsf) fsf.onchange=()=>{ const f=fsf.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ _freeSfx=rd.result; const st=document.getElementById('freeSfxStatus'); if(st) st.textContent='✓ 已载入自定义判定音（离线可用）'; }; rd.readAsDataURL(f); };
+  const fsd=document.getElementById('freeSfxDefault');
+  if(fsd) fsd.onclick=()=>{ const on=fsd.classList.toggle('on'); if(on){ _freeSfx=null; const st=document.getElementById('freeSfxStatus'); if(st) st.textContent='使用默认合成判定音'; } };
+  const fac=document.getElementById('freeAccent'); if(fac) fac.oninput=()=>{ _freeAccent=fac.value; };
+  const ft=document.getElementById('freeTitle'); if(ft) ft.oninput=()=>{ _freeTitle=ft.value.trim(); };
+  const fsave=document.getElementById('freeSave'); if(fsave) fsave.onclick=()=>{ saveFreeCfg(); toast && toast('已保存自定义配置（本机）'); };
+  const fstart=document.getElementById('freeStart');
+  if(fstart) fstart.onclick=()=>{
+    const cfg={ charts:_freeCharts, audio:_freeAudio||'', bgImages:_freeBg||[], sfx:(_freeSfx===undefined?null:_freeSfx), accent:_freeAccent||'', title:_freeTitle||'自由演奏', duration:_freeDur||0 };
+    if(!cfg.charts || !cfg.charts.normal || !cfg.charts.normal.length){ toast && toast('请先导入并解析谱面'); return; }
+    saveFreeCfg(); close();
+    try{ startFreeMode(cfg); }catch(e){ toast && toast('启动失败：'+e.message); console.error(e); }
+  };
+}
+
 /* ---------- 启动 ---------- */
 /* 音轨彻底失败时的兜底面板：重试 / 静音试玩（用 performance 时钟走谱面） */
 function bootFail(err){
@@ -2665,7 +2933,7 @@ function proceed(){
   $('#lyricistLbl').textContent = SONG.meta.lyricist || '—';
   $('#srcLbl').textContent = SONG.meta.source || '—';
   $('#resSong') && ($('#resSong').textContent = SONG.title || SONG.meta.title);
-  buildSongs(); buildDiffs(); buildModes(); applyMode(); refreshBest(); bindSettings();
+  buildSongs(); buildDiffs(); buildModes(); applyMode(); refreshBest(); bindSettings(); bindFree();
   // 首次进入引导（一次性，非遮挡、内容可见、可关）
   try{
     if(!localStorage.getItem('qc_firstrun')){

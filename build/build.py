@@ -36,6 +36,24 @@ def inject_up(html):
     return html.replace("__UP_AVATAR__", "")
 
 
+def read_audio_url():
+    """内置音轨外链地址（可选）：优先环境变量 QC_AUDIO_URL，其次 build/qc_config.json。
+    填了就把「分包版」的内置歌改成外链，dist 不再打包 song.mp3，省上传体积。"""
+    env = os.environ.get("QC_AUDIO_URL", "").strip()
+    if env:
+        return env
+    cfg = os.path.join(BUILD, "qc_config.json")
+    if os.path.exists(cfg):
+        try:
+            o = json.load(open(cfg, encoding="utf-8"))
+            u = (o.get("audio_url") or "").strip()
+            if u:
+                return u
+        except Exception:
+            pass
+    return ""
+
+
 def main():
     tpl = open(os.path.join(BUILD, "game.template.html"), encoding="utf-8").read()
     chart_raw = json.load(open(os.path.join(BUILD, "chart.json"), encoding="utf-8"))
@@ -51,7 +69,10 @@ def main():
     song0 = chart_raw["songs"][0] if chart_raw.get("songs") else chart_raw
     meta0 = song0.get("meta", {})
 
-    # ---------- 1) 单文件版 ----------
+    # 内置音轨外链地址（可选）：填了就外链，dist 不再打包 song.mp3
+    audio_url = read_audio_url()
+
+    # ---------- 1) 单文件版（始终内联，离线双击即玩 / itch.io） ----------
     single = render(tpl, chart_json, plat_css, plat_js, "data:audio/mpeg;base64," + b64)
     single = (single.replace("__COMPOSER__", meta0.get("composer", ""))
                     .replace("__LYRICIST__", meta0.get("lyricist", "")))
@@ -68,18 +89,27 @@ def main():
         p = os.path.join(DIST, name)
         if os.path.exists(p):
             os.remove(p)
-    split = render(tpl, chart_json, plat_css, plat_js, "song.mp3")
+    if audio_url:
+        split_audio = json.dumps(audio_url)       # 外链：dist 不再打包 song.mp3，省上传体积
+        print("??  分包使用外链音轨：%s" % audio_url)
+    else:
+        split_audio = "song.mp3"
+    split = render(tpl, chart_json, plat_css, plat_js, split_audio)
     split = (split.replace("__COMPOSER__", meta0.get("composer", ""))
                   .replace("__LYRICIST__", meta0.get("lyricist", "")))
     split = inject_up(split)
     with open(os.path.join(DIST, "index.html"), "w", encoding="utf-8") as f:
         f.write(split)
-    shutil.copyfile(mp3, os.path.join(DIST, "song.mp3"))
-    size_html = os.path.getsize(os.path.join(DIST, "index.html"))
-    size_mp3 = os.path.getsize(os.path.join(DIST, "song.mp3"))
-    print("OK  分包     dist/index.html  %.1f KB   dist/song.mp3  %.2f MB"
-          % (size_html / 1024, size_mp3 / 1024 / 1024))
-    if size_html > 1024 * 1024:
+    if audio_url:
+        print("OK  分包     dist/index.html  %.1f KB  （已外链，未打包 song.mp3）"
+              % (os.path.getsize(os.path.join(DIST, "index.html")) / 1024))
+    else:
+        shutil.copyfile(mp3, os.path.join(DIST, "song.mp3"))
+        size_html = os.path.getsize(os.path.join(DIST, "index.html"))
+        size_mp3 = os.path.getsize(os.path.join(DIST, "song.mp3"))
+        print("OK  分包     dist/index.html  %.1f KB   dist/song.mp3  %.2f MB"
+              % (size_html / 1024, size_mp3 / 1024 / 1024))
+    if os.path.getsize(os.path.join(DIST, "index.html")) > 1024 * 1024:
         print("!! dist/index.html 超过 1MB，Toy 会拒收", file=sys.stderr)
 
     # 参考：分离资源版（便于替换音轨）

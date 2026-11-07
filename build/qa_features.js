@@ -46,11 +46,18 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
     if (r.result && r.result.exceptionDetails) {
       const d = r.result.exceptionDetails;
-      return { __err: (d.exception && d.exception.description) || d.text };
+      const desc = (d.exception && (d.exception.description || d.exception.value)) || d.text || '(无描述)';
+      return { __err: desc };
     }
     return r.result && r.result.result ? r.result.result.value : undefined;
   };
-  const J = (s, tag) => { if (typeof s === 'string' && s.startsWith('ERR:')) throw new Error(tag + ' ' + s); return JSON.parse(s); };
+  const J = (s, tag) => {
+    if (s && typeof s === 'object' && Object.prototype.hasOwnProperty.call(s, '__err')) {
+      throw new Error('[' + tag + '] 页面内脚本异常：' + (s.__err || '(未知异常)'));
+    }
+    if (typeof s === 'string' && s.startsWith('ERR:')) throw new Error(tag + ' ' + s);
+    return JSON.parse(s);
+  };
 
   await send('Runtime.enable');
   await send('Page.enable');
@@ -150,10 +157,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   /* ---- 4. 判定音效 ---- */
   const sfx1 = await ev(`JSON.stringify({
     has: typeof Sfx!=='undefined',
-    methods: (typeof Sfx!=='undefined')?['init','judge','don','ka','setEnabled','setVol','resume','ensure'].filter(m=>typeof Sfx[m]==='function'):[]
+    methods: (typeof Sfx!=='undefined')?['init','judge','don','ka','setEnabled','setVol','resume','ensure','setCustomHit','decode'].filter(m=>typeof Sfx[m]==='function'):[]
   })`);
   const sx = J(sfx1, 'sfx');
-  T('Sfx 模块存在且方法齐全', sx.has && sx.methods.length === 8, sx.methods.join(','));
+  T('Sfx 模块存在且方法齐全', sx.has && sx.methods.length === 10, sx.methods.join(','));
   const sfx2 = await ev(`(function(){
     try{
       Sfx.init(abuf); Sfx.setVol(0.5); Sfx.setEnabled(true);
@@ -471,6 +478,51 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const lb3 = J(lb2, 'lb2');
   T('结算上报带上模式（供平台选榜）', lb3.mode === 'taiko' && lb3.score === 12345,
     'mode=' + lb3.mode + ' score=' + lb3.score);
+
+  /* ---- 10. 自由模式 / 自定义工坊 ---- */
+  // NoteLine 格式转换：毫秒→秒、4 轨、跳过 "end" 结束标记
+  const nlRaw = JSON.stringify({"0":{"0":{"start":1000},"1":{"start":2000}},"1":{"0":{"start":1500}},"2":{},"3":{"0":{"start":"end"}}});
+  const nl1 = await ev(`(function(){ var nl=${nlRaw}; var r=convNoteLine(nl);
+    return JSON.stringify({n:r.length, t0:r[0]?r[0][0]:null, l0:r[0]?r[0][1]:null, t1:r[1]?r[1][0]:null, l1:r[1]?r[1][1]:null, t2:r[2]?r[2][0]:null, l2:r[2]?r[2][1]:null, lanesOk:r.every(x=>x[1]>=0&&x[1]<4)}); })()`);
+  const nl = J(nl1, 'nl');
+  T('NoteLine 谱面转青葱格式（毫秒→秒）', nl.n === 3 && Math.abs(nl.t0-1.0)<1e-6 && Math.abs(nl.t2-2.0)<1e-6, `n=${nl.n} t0=${nl.t0} t2=${nl.t2}`);
+  T('NoteLine 转换后轨道落在 0~3 且跳过 "end"', nl.lanesOk && nl.l1 === 1 && nl.l2 === 0, `l0=${nl.l0} l1=${nl.l1} l2=${nl.l2}`);
+
+  // 谱面自动识别：NoteLine 与原生 [[t,lane,hold]] 都能解析
+  const pc1 = await ev(`(function(){ var r=parseChartText(${JSON.stringify(nlRaw)}); return JSON.stringify({n:r.normal.length, count:r.count}); })()`);
+  const pc = J(pc1, 'pc');
+  T('parseChartText 识别 NoteLine 格式', pc.n === 3 && pc.count === 3, `n=${pc.n}`);
+  const pc2 = await ev(`(function(){ var r=parseChartText(JSON.stringify([[1.0,0,0],[2.5,3,0],[3.0,1,0]])); return JSON.stringify({n:r.normal.length}); })()`);
+  const pcx = J(pc2, 'pc2');
+  T('parseChartText 识别青葱原生格式', pcx.n === 3, `n=${pcx.n}`);
+
+  // 构建自定义 SONG：歌词清空、来源标记为自定义、难度回退正常
+  const bf1 = await ev(`(function(){ var cfg={charts:{normal:[[1.0,0,0],[2.5,3,0]]}, title:'我的歌'}; var s=buildFreeSong(cfg); return JSON.stringify({id:s.id, src:s.meta.source, lyrics:(s.lyrics||[]).length, normalN:s.charts.normal.length, dur:s.meta.duration, title:s.title}); })()`);
+  const bf = J(bf1, 'bf');
+  T('buildFreeSong 标记为 __free__ 且来源=自定义', bf.id==='__free__' && bf.src==='自定义', `id=${bf.id} src=${bf.src}`);
+  T('自由模式歌词清空（关闭卡拉OK）', bf.lyrics === 0, `lyrics=${bf.lyrics}`);
+  T('自定义 SONG 谱面与曲名生效', bf.normalN === 2 && bf.title==='我的歌', `n=${bf.normalN} title=${bf.title}`);
+
+  // 自定义配色：--amber 被改写
+  const ac1 = await ev(`(function(){ applyFreeAccent('#ff0000');
+    return JSON.stringify({amber:getComputedStyle(document.documentElement).getPropertyValue('--amber').trim()}); })()`);
+  const ac = J(ac1, 'ac');
+  T('applyFreeAccent 改写 --amber 主题色', ac.amber === 'rgb(255,0,0)', 'amber=' + ac.amber);
+
+  // 工坊面板：按钮存在、点击打开、含关键导入控件
+  const fr1 = await ev(`(function(){
+    var btn=document.getElementById('freeBtn'), ov=document.getElementById('freeOverlay');
+    var has=!!btn && !!ov;
+    if(btn) btn.click();
+    var open=ov? ov.classList.contains('on'):false;
+    var ids=['freeChartFile','freeChartText','freeParse','freeAudioFile','freeAudioUrl','freeBgFiles','freeSfxFile','freeAccent','freeTitle','freeStart','freeSave'];
+    var ctrl=ids.every(function(i){ return !!document.getElementById(i); });
+    return JSON.stringify({has:has, open:open, ctrl:ctrl});
+  })()`);
+  const fr = J(fr1, 'fr');
+  T('标题页有「自由模式」按钮且工坊面板存在', fr.has, `has=${fr.has}`);
+  T('点击自由模式打开工坊面板', fr.open === true, `open=${fr.open}`);
+  T('工坊含谱面/音频/背景/音效/配色/开始全套控件', fr.ctrl === true, `ctrl=${fr.ctrl}`);
 
   // 输出
   console.log('\n================ 新功能专项自测 ================');

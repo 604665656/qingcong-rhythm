@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>青葱岁月 · 连线B 生成式星线 (半空生成·点对点·波浪)</title>
+<style>
+  :root{
+    --bg:#05060f; --hi:#7ef0c2; --acc:#ff9ec7; --warn:#ffd166; --txt:#eaf0ff; --blue:#9ec7ff;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; overflow:hidden; user-select:none; touch-action:none;
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+  #bg{ position:fixed; inset:0; z-index:0; overflow:hidden;
+    background:radial-gradient(120% 110% at 50% 120%, #101a44 0%, var(--bg) 60%); }
+  #bg i{ position:absolute; border-radius:50%; filter:blur(70px); opacity:.30; mix-blend-mode:screen; }
+  #bg i.a{ width:50vmin; height:50vmin; background:#3a5bff; left:-10vmin; top:-6vmin; animation:fl1 13s ease-in-out infinite; }
+  #bg i.b{ width:44vmin; height:44vmin; background:#ff4fa3; right:-8vmin; top:34vmin; animation:fl2 17s ease-in-out infinite; }
+  #bg i.c{ width:40vmin; height:40vmin; background:#16d6a7; left:30vmin; bottom:-12vmin; animation:fl1 19s ease-in-out infinite reverse; }
+  @keyframes fl1{ 0%,100%{ transform:translate(0,0) } 50%{ transform:translate(7vmin,6vmin) } }
+  @keyframes fl2{ 0%,100%{ transform:translate(0,0) } 50%{ transform:translate(-8vmin,5vmin) } }
+
+  #wrap{ position:fixed; inset:0; z-index:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:10px; }
+  #hud{ display:flex; gap:30px; font-size:14px; opacity:.92; text-shadow:0 0 10px rgba(126,240,194,.4); }
+  #hud b{ font-size:24px; color:var(--hi); }
+  #judge{ height:30px; font-size:24px; font-weight:800; letter-spacing:3px; }
+  #comboMsg{ height:22px; font-size:16px; color:var(--warn); font-weight:700; }
+  #stage{ position:relative; width:min(88vmin,520px); height:min(88vmin,520px); }
+  canvas{ position:absolute; inset:0; width:100%; height:100%; }
+  .keys{ font-size:12px; opacity:.7; text-align:center; max-width:520px; }
+  #overlay{ position:fixed; inset:0; z-index:10; background:rgba(4,6,15,.94);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; padding:28px; }
+  #overlay h1{ margin:0; font-size:32px; letter-spacing:2px;
+    background:linear-gradient(120deg,var(--hi),var(--blue),var(--acc)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #overlay p{ margin:0; max-width:520px; line-height:1.8; opacity:.9; font-size:14px; }
+  #overlay .tag{ font-size:12px; opacity:.6; }
+  button{ font:inherit; font-size:18px; padding:13px 34px; border:0; border-radius:30px;
+    background:linear-gradient(120deg,var(--hi),#56c8ff); color:#04243a; font-weight:800; cursor:pointer;
+    box-shadow:0 6px 24px rgba(86,200,255,.35); }
+  button:active{ transform:scale(.97); }
+</style>
+</head>
+<body>
+<div id="bg"><i class="a"></i><i class="b"></i><i class="c"></i></div>
+<div id="wrap">
+  <div id="hud"><div>分数 <b id="score">0</b></div><div>连击 <b id="comboN">0</b></div><div>精度 <b id="acc">100%</b></div></div>
+  <div id="judge"></div>
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div id="comboMsg"></div>
+  <div class="keys">空格 / 点击屏幕：在连线荡到下一颗星时按拍 · 星点在半空生成、点对点连线、命中荡开波浪</div>
+</div>
+<div id="overlay">
+  <h1>连线 B · 生成式星线</h1>
+  <p>没有固定轨道：星点随节拍在半空中<b>逐颗浮现</b>，连线像能量波一样<b>从一点画向另一点</b>，光到终点即命中时刻。
+     命中即<b>荡开同心波浪</b>，走过的路径累积成星座。内置演示谱面，配真实和弦进行 + 琶音 + 鼓组。<br>完美 ±55ms · 良好 ±110ms · 及格 ±170ms。</p>
+  <button id="startBtn">开始试玩</button>
+  <div class="tag">纯前端 / 零依赖 / WebAudio 实时合成</div>
+</div>
+
+<script>
+"use strict";
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d'), stage=document.getElementById('stage');
+const scoreEl=document.getElementById('score'), comboEl=document.getElementById('comboN'),
+      accEl=document.getElementById('acc'), judgeEl=document.getElementById('judge'), comboMsg=document.getElementById('comboMsg');
+const overlay=document.getElementById('overlay'), startBtn=document.getElementById('startBtn');
+
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+function hexA(hex,a){ const h=hex.replace('#',''); const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16); return `rgba(${r},${g},${b},${a})`; }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+// ---------- 配置 ----------
+const BPM=120, SPB=60/BPM, APPROACH=1.1, JW={ PERFECT:0.055, GREAT:0.11, GOOD:0.17 };
+
+// ---------- 音频引擎（与九宫格同款） ----------
+let actx=null, master=null, noiseBuf=null, START=0, running=false, schedTimer=null, nextBeat=0;
+function ensureAudio(){
+  if(actx) return;
+  try {
+    const AC = window.AudioContext||window.webkitAudioContext;
+    if(!AC) return;
+    actx = new AC();
+    master = actx.createGain(); master.gain.value=0.6; master.connect(actx.destination);
+    const b=actx.createBuffer(1, Math.floor(actx.sampleRate*0.3), actx.sampleRate);
+    const d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; noiseBuf=b;
+  } catch(e){ actx=null; master=null; }
+}
+function playPad(freqs,t,dur){ freqs.forEach(f=>{ const o=actx.createOscillator(),g=actx.createGain(),fl=actx.createBiquadFilter();
+  o.type='sawtooth'; o.frequency.value=f; o.detune.value=(Math.random()*8-4); fl.type='lowpass'; fl.frequency.value=1300;
+  o.connect(fl); fl.connect(g); g.connect(master); const a=0.25,r=0.45;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.09,t+a); g.gain.setValueAtTime(0.09,Math.max(t+a,t+dur-r)); g.gain.linearRampToValueAtTime(0.0001,t+dur);
+  o.start(t); o.stop(t+dur+0.05); }); }
+function playBass(f,t,dur){ const o=actx.createOscillator(),g=actx.createGain(); o.type='triangle'; o.frequency.value=f; o.connect(g); g.connect(master);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.17,t+0.012); g.gain.exponentialRampToValueAtTime(0.0008,t+dur); o.start(t); o.stop(t+dur+0.02); }
+function playArp(f,t){ const o=actx.createOscillator(),g=actx.createGain(),fl=actx.createBiquadFilter();
+  o.type='square'; o.frequency.value=f; fl.type='lowpass'; fl.frequency.value=2400; o.connect(fl); fl.connect(g); g.connect(master);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.085,t+0.005); g.gain.exponentialRampToValueAtTime(0.0008,t+0.18); o.start(t); o.stop(t+0.2); }
+function playKick(t){ const o=actx.createOscillator(),g=actx.createGain(); o.type='sine'; o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(45,t+0.12);
+  g.gain.setValueAtTime(0.5,t); g.gain.exponentialRampToValueAtTime(0.0008,t+0.18); o.connect(g); g.connect(master); o.start(t); o.stop(t+0.2); }
+function playSnare(t){ const s=actx.createBufferSource(); s.buffer=noiseBuf; const f=actx.createBiquadFilter(); f.type='highpass'; f.frequency.value=1500;
+  const g=actx.createGain(); g.gain.setValueAtTime(0.22,t); g.gain.exponentialRampToValueAtTime(0.0008,t+0.12); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t+0.14); }
+function playHat(t){ const s=actx.createBufferSource(); s.buffer=noiseBuf; const f=actx.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000;
+  const g=actx.createGain(); g.gain.setValueAtTime(0.05,t); g.gain.exponentialRampToValueAtTime(0.0006,t+0.05); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t+0.06); }
+const PROG=[
+  {pad:[220.00,261.63,329.63], bass:110.00}, {pad:[174.61,220.00,261.63], bass:87.31},
+  {pad:[261.63,329.63,392.00], bass:130.81}, {pad:[196.00,246.94,293.66], bass:98.00} ];
+function scheduler(){
+  if(!running) return;
+  const nowPerf=performance.now(), aheadPerf=nowPerf+120, live=actx&&actx.state==='running';
+  while(START + nextBeat*SPB*1000 < aheadPerf){
+    const b=nextBeat, bar=Math.floor(b/4), bip=b%4;
+    if(live){ const t=actx.currentTime+Math.max(0,(START+b*SPB*1000-nowPerf)/1000); const ch=PROG[bar%PROG.length];
+      if(bip===0) playPad(ch.pad,t,4*SPB); playBass(ch.bass,t,SPB*0.9); playKick(t); if(bip===2) playKick(t);
+      if(bip===1||bip===3) playSnare(t); playHat(t); playHat(t+SPB/2);
+      const a0=ch.pad[0]*2,a1=ch.pad[1]*2,a2=ch.pad[2]*2; playArp(a0,t); playArp(a2,t+SPB/2);
+      if(bar>=4){ playArp(a1,t+SPB*0.25); playArp(a1,t+SPB*0.75); } }
+    nextBeat++;
+  }
+}
+
+// ---------- 几何：半空中生成的星点路径 ----------
+let CW=520, CH=520, PTS=[]; const NODE_R=16;
+function genPoints(n, seed){ const rnd=mulberry32(seed); const pts=[]; let ang=rnd()*Math.PI*2, x=0.5, y=0.5;
+  for(let i=0;i<n;i++){ ang+=(rnd()*1.7-0.85); const dist=0.13+rnd()*0.11; x+=Math.cos(ang)*dist; y+=Math.sin(ang)*dist;
+    x=clamp(x,0.15,0.85); y=clamp(y,0.17,0.83); pts.push({x,y}); } return pts; }
+function resize(){ cv.width=stage.clientWidth*devicePixelRatio; cv.height=stage.clientHeight*devicePixelRatio;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); CW=stage.clientWidth; CH=stage.clientHeight; }
+addEventListener('resize', resize); resize();
+function P(i){ const p=PTS[i]; return {x:p.x*CW, y:p.y*CH}; }
+
+// 波浪能量连线：从 a 向 b 按进度 k 画，带正弦波抖动
+function drawWaveLine(a,b,k,amp,waves,col,width,alpha){
+  const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1; const px=-dy/len, py=dx/len;
+  const steps=Math.max(2, Math.floor(len/7));
+  ctx.beginPath();
+  for(let s=0;s<=steps;s++){ const tt=s/steps; if(tt>k) break;
+    const bx=lerp(a.x,b.x,tt), by=lerp(a.y,b.y,tt);
+    const env=Math.sin(tt*Math.PI);
+    const off=Math.sin(tt*waves*Math.PI*2)*amp*env;
+    const x=bx+px*off, y=by+py*off;
+    if(s===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle=hexA(col,alpha); ctx.lineWidth=width; ctx.lineCap='round'; ctx.stroke();
+}
+
+// ---------- 谱面：星点 + 顺序连接段（每拍一段） ----------
+let segments=[], END=0;
+function buildChart(){
+  PTS = genPoints(15, 20261029);
+  segments=[]; let t=4*SPB;
+  for(let i=0;i<PTS.length-1;i++){ segments.push({t, from:i, to:i+1, judged:false, grade:null}); t+=SPB; }
+  segments.push({t:t+4*SPB, tail:true});
+  END = segments[segments.length-1].t + 0.5;
+}
+
+// ---------- 状态 ----------
+let score=0, combo=0, maxCombo=0, judged=0, accSum=0, accCnt=0, finished=false;
+const nodeFlash=new Array(16).fill(null); const waves=[]; let now=0;
+function resetGame(){ score=0; combo=0; maxCombo=0; judged=0; accSum=0; accCnt=0; finished=false; nextBeat=0;
+  segments.forEach(s=>{ if(!s.tail){ s.judged=false; s.grade=null; } }); waves.length=0; for(let i=0;i<nodeFlash.length;i++) nodeFlash[i]=null; }
+function songTime(){ return (performance.now()-START)/1000; }
+function grade(bd){ let j='GOOD',v=100,add=0.4;
+  if(bd<=JW.PERFECT){j='PERFECT';v=300;add=1;} else if(bd<=JW.GREAT){j='GREAT';v=200;add=0.75;}
+  score+=v+combo*2; combo++; maxCombo=Math.max(maxCombo,combo); accSum+=add; accCnt++; judged++; showJudge(j); return j; }
+function tapAdvance(){
+  if(!running) return; const t=songTime(); let best=null;
+  for(const s of segments){ if(s.judged||s.tail) continue; best=s; break; }
+  if(!best) return;
+  const d=Math.abs(best.t-t);
+  if(d<=JW.GOOD){ best.judged=true; best.hitT=t; const j=grade(d); const p=P(best.to);
+    waves.push({x:p.x,y:p.y,t0:performance.now(),color:'#7ef0c2',maxR:Math.max(1,CW*0.10)});
+    waves.push({x:p.x,y:p.y,t0:performance.now()+70,color:'#9ec7ff',maxR:Math.max(1,CW*0.16)});
+    nodeFlash[best.to]={t0:performance.now(),color:'#ffffff',dur:0.18}; }
+}
+function showJudge(t){ judgeEl.textContent=t;
+  judgeEl.style.color = t==='PERFECT'?'var(--hi)':t==='GREAT'?'var(--warn)':(t==='GOOD')?'var(--acc)':'#ff6b6b'; }
+function updateHud(){ scoreEl.textContent=score; comboEl.textContent=combo;
+  comboMsg.textContent = combo>=5? combo+' 连击!' : ''; accEl.textContent = accCnt? Math.round(accSum/accCnt*100)+'%' : '100%'; }
+
+// ---------- 渲染 ----------
+let lastT=performance.now();
+function render(){
+  const tperf=performance.now(); const dt=Math.min(0.05,(tperf-lastT)/1000); lastT=tperf;
+  ctx.clearRect(0,0,CW,CH); now = running ? songTime() : now;
+ try{
+  if(running){
+    for(const s of segments){ if(s.judged||s.tail) continue; if(now-s.t>JW.GOOD){ s.judged=true; s.grade='MISS'; combo=0; showJudge('MISS'); updateHud(); } }
+    const tail=segments.find(s=>s.tail); if(tail&&now>=tail.t) finish();
+  }
+  ctx.lineCap='round';
+  // 已连接段：命中后 0.5s 内淡出消失（不再永久停留）
+  for(let i=0;i<segments.length-1;i++){ const s=segments[i]; if(!s.judged||s.grade==='MISS'||s.hitT==null) continue;
+    const fade=clamp(1-(now-s.hitT)/0.5,0,1); if(fade<=0) continue;
+    const a=P(s.from), b=P(s.to); drawWaveLine(a,b,1,4,2,'#7ef0c2',3,0.55*fade); }
+  // 活动段：波浪能量连线，从 from 画向 to
+  let act=null; for(const s of segments){ if(s.judged||s.tail) continue; act=s; break; }
+  if(act){ const a=P(act.from), b=P(act.to); const d=act.t-now;
+    const k=clamp(1-d/APPROACH,0,1); const litCol='#ff9ec7';
+    drawWaveLine(a,b,1,3,2,'#ff9ec7',2,0.10);
+    drawWaveLine(a,b,k,7,3,litCol,5,0.95);
+    const tip={x:lerp(a.x,b.x,k), y:lerp(a.y,b.y,k)};
+    ctx.beginPath(); ctx.arc(tip.x,tip.y,NODE_R*0.7,0,7); ctx.fillStyle=hexA(litCol,0.95); ctx.fill();
+    const eg=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,NODE_R*2.2);
+    eg.addColorStop(0,hexA(litCol,0.5*k)); eg.addColorStop(1,hexA(litCol,0));
+    ctx.beginPath(); ctx.arc(b.x,b.y,NODE_R*2.2,0,7); ctx.fillStyle=eg; ctx.fill();
+  }
+  // 星点（半空生成：临近才浮现）
+  for(let i=0;i<PTS.length;i++){
+    let show=0, col='#9ec7ff';
+    for(const s of segments){
+      if(s.judged&&s.grade!=='MISS'&&s.hitT!=null){ if(s.from===i||s.to===i){ const fade=clamp(1-(now-s.hitT)/0.5,0,1); show=Math.max(show,fade); col='#7ef0c2'; } }
+      else if(!s.judged&&!s.tail){ if(s.to===i||s.from===i){ const d=s.t-now; show=Math.max(show, clamp(1-d/APPROACH,0,1)); col='#ff9ec7'; } } }
+    let fl=0,flc='#fff'; const f=nodeFlash[i];
+    if(f){ const age=(tperf-f.t0)/1000; if(age>=0&&age<f.dur){ fl=1-age/f.dur; flc=f.color; } else nodeFlash[i]=null; }
+    const og=Math.max(show,fl); if(og<=0.001) continue;
+    const p=P(i); const useCol=fl>0?flc:col;
+    ctx.beginPath(); ctx.arc(p.x,p.y,NODE_R,0,7); ctx.fillStyle='rgba(14,22,54,.9)'; ctx.fill();
+    if(og>0){ const grd=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,NODE_R);
+      grd.addColorStop(0,hexA(useCol,og)); grd.addColorStop(1,hexA(useCol,0));
+      ctx.beginPath(); ctx.arc(p.x,p.y,NODE_R,0,7); ctx.fillStyle=grd; ctx.fill();
+      ctx.save(); ctx.shadowColor=useCol; ctx.shadowBlur=24*og; ctx.beginPath(); ctx.arc(p.x,p.y,NODE_R,0,7); ctx.fillStyle=hexA(useCol,0.16*og); ctx.fill(); ctx.restore(); }
+    const scale=og>0?1+0.18*og+(fl>0?0.12*fl:0):1;
+    if(scale>1.001){ ctx.save(); ctx.translate(p.x,p.y); ctx.scale(scale,scale); ctx.translate(-p.x,-p.y);
+      ctx.beginPath(); ctx.arc(p.x,p.y,NODE_R,0,7); ctx.strokeStyle=hexA(useCol,0.9); ctx.lineWidth=3; ctx.stroke(); ctx.restore(); }
+  }
+  // 波浪（命中荡开）
+  for(let i=waves.length-1;i>=0;i--){ const w=waves[i]; const age=(tperf-w.t0)/1000; if(age>0.7){ waves.splice(i,1); continue; }
+    const k=age/0.7; ctx.beginPath(); ctx.arc(w.x,w.y,Math.max(1,w.maxR*k),0,7);
+    ctx.strokeStyle=hexA(w.color,0.6*(1-k)); ctx.lineWidth=3; ctx.stroke(); }
+  if(combo>=2){ ctx.save(); ctx.textAlign='center'; ctx.font='800 38px -apple-system,"PingFang SC",sans-serif';
+    ctx.shadowColor='#ffd166'; ctx.shadowBlur=18; ctx.fillStyle='#ffd166'; ctx.fillText(combo+' 连击', CW/2, CH*0.05); ctx.restore(); }
+ }catch(e){ /* 渲染异常绝不让主循环死 */ }
+  requestAnimationFrame(render);
+}
+function finish(){ if(finished) return; finished=true; running=false; showJudge(''); comboMsg.textContent='';
+  overlay.style.display='flex'; const acc=accCnt? Math.round(accSum/accCnt*100):100;
+  overlay.innerHTML = `<h1>连线 B · 完成</h1><p>分数 <b>${score}</b> · 最大连击 <b>${maxCombo}</b> · 精度 <b>${acc}%</b><br><span class="tag">生成式星线 · 连点成线原型</span></p><button id="again">再来一次</button>`;
+  document.getElementById('again').onclick=()=>{ overlay.style.display='none'; startGame(); }; }
+function startGame(){ ensureAudio(); if(actx&&actx.state==='suspended'){ try{ actx.resume(); }catch(e){} }
+  buildChart(); resetGame(); updateHud(); showJudge(''); START=performance.now()+180; running=true; finished=false;
+  if(schedTimer) clearInterval(schedTimer); schedTimer=setInterval(scheduler,25); }
+startBtn.onclick=()=>{ overlay.style.display='none'; startGame(); };
+cv.addEventListener('pointerdown', e=>{ if(!running) return; if(actx&&actx.state==='suspended'){ try{ actx.resume(); }catch(e){} } tapAdvance(); });
+addEventListener('keydown', e=>{ if(e.code==='Space'){ e.preventDefault(); if(!running) return; if(actx&&actx.state==='suspended'){ try{ actx.resume(); }catch(e){} } tapAdvance(); } });
+requestAnimationFrame(render);
+window.__QC = { get state(){ return { running, score, combo, maxCombo, segments:segments.length, notes:segments.length, songTime:songTime() }; },
+  startGame, tapAdvance, get songTime(){ return songTime(); },
+  audioState(){ return actx? actx.state:'none'; }, suspendAudio(){ if(actx){ try{ actx.suspend(); }catch(e){} } } };
+window.__ready = true;
+</script>
+</body>
+</html>
